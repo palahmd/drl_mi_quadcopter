@@ -11,6 +11,8 @@ cmake .. -DCMAKE_INSTALL_PREFIX=~/raisim_install -DRAISIM_EXAMPLES=ON -DRAISIM_P
  
 ## Setup and run
 
+copy your activation key into the folder /rsc. It is blacklisted by .gitignore and will not be uploaded into this repository in a commit.
+
 ```commandline 
 cd $WHERE_THIS_REPOSITORY_IS_CLONED && mkdir build && cd build 
 cmake .. -DCMAKE_PREFIX_PATH=~/raisim_install && make 
