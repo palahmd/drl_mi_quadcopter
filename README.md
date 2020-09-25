@@ -6,7 +6,7 @@ Install the raisim library according to the description of www.raisim.com:
 
 ```commandline 
 cd $WHERE_RAISIMLIB_IS_CLONED && mkdir build && cd build 
-cmake .. -DCMAKE_INSTALL_PATH=~/raisim_install -DRAISIM_EXAMPLES=ON -DRAISIM_PY=ON && make 
+cmake .. -DCMAKE_INSTALL_PREFIX=~/raisim_install -DRAISIM_EXAMPLES=ON -DRAISIM_PY=ON && make install
 ``` 
  
 ## Setup and run
