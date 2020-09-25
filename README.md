@@ -6,14 +6,16 @@ Install the raisim library according to the description of www.raisim.com:
 
 ```commandline 
 cd $WHERE_RAISIMLIB_IS_CLONED && mkdir build && cd build 
-commandline cmake .. -DCMAKE_INSTALL_PATH=~/raisim_install -DRAISIM_EXAMPLES=ON -DRAISIM_PY=ON && make 
+cmake .. -DCMAKE_INSTALL_PREFIX=~/raisim_install -DRAISIM_EXAMPLES=ON -DRAISIM_PY=ON && make install
 ``` 
  
 ## Setup and run
 
+copy your activation key into the folder /rsc. It is blacklisted by .gitignore and will not be uploaded into this repository in a commit.
+
 ```commandline 
 cd $WHERE_THIS_REPOSITORY_IS_CLONED && mkdir build && cd build 
-commandline cmake .. -DCMAKE_PREFIX_PATH=~/raisim_install && make 
+cmake .. -DCMAKE_PREFIX_PATH=~/raisim_install && make 
 ``` 
 
 
