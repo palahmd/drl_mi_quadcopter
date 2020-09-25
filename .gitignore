@@ -30,3 +30,11 @@
 *.exe
 *.out
 *.app
+
+# folders
+build/
+cmake-build-debug/
+.idea/
+
+# activation key
+rsc/activation.raisim

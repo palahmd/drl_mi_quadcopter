@@ -5,8 +5,7 @@ int main(int argc, char* argv[]) {
   auto binaryPath = raisim::Path::setFromArgv(argv[0]);
   raisim::World::setActivationKey( binaryPath.getDirectory() + "\\rsc\\activation.raisim");
   raisim::World world;
-  auto quadcopter = world.addArticulatedSystem(binaryPath.getDirectory() + "\\rsc\\quadcopter\\urdf\\anymal.urdf");
-  auto ball = world.addSphere(1, 1);
+  auto quadcopter = world.addArticulatedSystem(binaryPath.getDirectory() + "\\rsc\\quadcopter\\urdf\\hummingbird.urdf");
   auto ground = world.addGround();
   world.setTimeStep(0.002);
 
