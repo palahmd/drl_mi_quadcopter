@@ -22,7 +22,8 @@
   See the License for the specific language governing permissions and
   limitations under the License.
 -->
-<robot name="hummingbird" xmlns:xacro="http://ros.org/wiki/xacro">
+
+<robot name="hummingbird">
   <link name="hummingbird/base_link"/>
   <joint name="hummingbird/base_joint" type="fixed">
     <origin rpy="0 0 0" xyz="0 0 0"/>
@@ -50,19 +51,21 @@
       </geometry>
     </collision>
   </link>
+
   <!-- attach multirotor_base_plugin to the base_link -->
-  <gazebo>
+  <!-- <gazebo>
     <plugin filename="librotors_gazebo_multirotor_base_plugin.so" name="multirotor_base_plugin">
       <robotNamespace>hummingbird</robotNamespace>
       <linkName>hummingbird/base_link</linkName>
       <rotorVelocitySlowdownSim>10</rotorVelocitySlowdownSim>
     </plugin>
-  </gazebo>
+  </gazebo> -->
+
   <joint name="hummingbird/rotor_0_joint" type="continuous">
     <origin rpy="0 0 0" xyz="0.17 0 0.01"/>
     <axis xyz="0 0 1"/>
-    <!-- TODO(ff): not currently set because it's not yet supported -->
-    <!-- <limit effort="2000" velocity="${max_rot_velocity}" /> -->
+    <limit effort="2000" velocity="838" />
+    <dynamics damping="0.0" friction="0.0"/>
     <parent link="hummingbird/base_link"/>
     <child link="hummingbird/rotor_0"/>
   </joint>
@@ -75,8 +78,7 @@
     <visual>
       <geometry>
         <mesh filename="meshes/propeller_cw.dae" scale="0.1 0.1 0.1"/>
-        <!-- The propeller meshes have a radius of 1m -->
-        <!-- <box size="${2*radius_rotor} 0.01 0.005"/> -->
+        <box size="${2*radius_rotor} 0.01 0.005"/>
       </geometry>
     </visual>
     <collision>
@@ -86,7 +88,8 @@
       </geometry>
     </collision>
   </link>
-  <gazebo>
+
+  <!-- <gazebo>
     <plugin filename="librotors_gazebo_motor_model.so" name="hummingbird_front_motor_model">
       <robotNamespace>hummingbird</robotNamespace>
       <jointName>hummingbird/rotor_0_joint</jointName>
@@ -107,12 +110,13 @@
   </gazebo>
   <gazebo reference="hummingbird/rotor_0">
     <material>Gazebo/Red</material>
-  </gazebo>
+  </gazebo> -->
+
   <joint name="hummingbird/rotor_1_joint" type="continuous">
     <origin rpy="0 0 0" xyz="0 0.17 0.01"/>
     <axis xyz="0 0 1"/>
-    <!-- TODO(ff): not currently set because it's not yet supported -->
-    <!-- <limit effort="2000" velocity="${max_rot_velocity}" /> -->
+    <limit effort="2000" velocity="838" />
+    <dynamics damping="0.0" friction="0.0"/>
     <parent link="hummingbird/base_link"/>
     <child link="hummingbird/rotor_1"/>
   </joint>
@@ -125,8 +129,7 @@
     <visual>
       <geometry>
         <mesh filename="meshes/propeller_ccw.dae" scale="0.1 0.1 0.1"/>
-        <!-- The propeller meshes have a radius of 1m -->
-        <!-- <box size="${2*radius_rotor} 0.01 0.005"/> -->
+        <box size="${2*radius_rotor} 0.01 0.005"/>
       </geometry>
     </visual>
     <collision>
@@ -136,7 +139,8 @@
       </geometry>
     </collision>
   </link>
-  <gazebo>
+
+  <!-- <gazebo>
     <plugin filename="librotors_gazebo_motor_model.so" name="hummingbird_left_motor_model">
       <robotNamespace>hummingbird</robotNamespace>
       <jointName>hummingbird/rotor_1_joint</jointName>
@@ -157,12 +161,13 @@
   </gazebo>
   <gazebo reference="hummingbird/rotor_1">
     <material>Gazebo/Blue</material>
-  </gazebo>
-  <joint name="hummingbird/rotor_2_joint" type="continuous">
+  </gazebo> -->
+  
+<joint name="hummingbird/rotor_2_joint" type="continuous">
     <origin rpy="0 0 0" xyz="-0.17 0 0.01"/>
     <axis xyz="0 0 1"/>
-    <!-- TODO(ff): not currently set because it's not yet supported -->
-    <!-- <limit effort="2000" velocity="${max_rot_velocity}" /> -->
+    <limit effort="2000" velocity="838" />
+    <dynamics damping="0.0" friction="0.0"/>
     <parent link="hummingbird/base_link"/>
     <child link="hummingbird/rotor_2"/>
   </joint>
@@ -175,8 +180,7 @@
     <visual>
       <geometry>
         <mesh filename="meshes/propeller_cw.dae" scale="0.1 0.1 0.1"/>
-        <!-- The propeller meshes have a radius of 1m -->
-        <!-- <box size="${2*radius_rotor} 0.01 0.005"/> -->
+        <box size="${2*radius_rotor} 0.01 0.005"/>
       </geometry>
     </visual>
     <collision>
@@ -186,7 +190,8 @@
       </geometry>
     </collision>
   </link>
-  <gazebo>
+
+  <!-- <gazebo>
     <plugin filename="librotors_gazebo_motor_model.so" name="hummingbird_back_motor_model">
       <robotNamespace>hummingbird</robotNamespace>
       <jointName>hummingbird/rotor_2_joint</jointName>
@@ -207,12 +212,13 @@
   </gazebo>
   <gazebo reference="hummingbird/rotor_2">
     <material>Gazebo/Blue</material>
-  </gazebo>
+  </gazebo> -->
+
   <joint name="hummingbird/rotor_3_joint" type="continuous">
     <origin rpy="0 0 0" xyz="0 -0.17 0.01"/>
     <axis xyz="0 0 1"/>
-    <!-- TODO(ff): not currently set because it's not yet supported -->
-    <!-- <limit effort="2000" velocity="${max_rot_velocity}" /> -->
+    <limit effort="2000" velocity="838" />
+    <dynamics damping="0.0" friction="0.0"/>
     <parent link="hummingbird/base_link"/>
     <child link="hummingbird/rotor_3"/>
   </joint>
@@ -225,8 +231,7 @@
     <visual>
       <geometry>
         <mesh filename="meshes/propeller_ccw.dae" scale="0.1 0.1 0.1"/>
-        <!-- The propeller meshes have a radius of 1m -->
-        <!-- <box size="${2*radius_rotor} 0.01 0.005"/> -->
+        <box size="${2*radius_rotor} 0.01 0.005"/>
       </geometry>
     </visual>
     <collision>
@@ -236,7 +241,8 @@
       </geometry>
     </collision>
   </link>
-  <gazebo>
+
+  <!-- <gazebo>
     <plugin filename="librotors_gazebo_motor_model.so" name="hummingbird_right_motor_model">
       <robotNamespace>hummingbird</robotNamespace>
       <jointName>hummingbird/rotor_3_joint</jointName>
@@ -257,6 +263,7 @@
   </gazebo>
   <gazebo reference="hummingbird/rotor_3">
     <material>Gazebo/Blue</material>
-  </gazebo>
+  </gazebo> -->
+
 </robot>
 
