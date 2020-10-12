@@ -89,7 +89,7 @@
     </collision>
   </link>
 
-  <!-- <gazebo>
+  <gazebo>
     <plugin filename="librotors_gazebo_motor_model.so" name="hummingbird_front_motor_model">
       <robotNamespace>hummingbird</robotNamespace>
       <jointName>hummingbird/rotor_0_joint</jointName>
@@ -110,7 +110,7 @@
   </gazebo>
   <gazebo reference="hummingbird/rotor_0">
     <material>Gazebo/Red</material>
-  </gazebo> -->
+  </gazebo>
 
   <joint name="hummingbird/rotor_1_joint" type="continuous">
     <origin rpy="0 0 0" xyz="0 0.17 0.01"/>
@@ -140,7 +140,7 @@
     </collision>
   </link>
 
-  <!-- <gazebo>
+  <gazebo>
     <plugin filename="librotors_gazebo_motor_model.so" name="hummingbird_left_motor_model">
       <robotNamespace>hummingbird</robotNamespace>
       <jointName>hummingbird/rotor_1_joint</jointName>
@@ -161,7 +161,7 @@
   </gazebo>
   <gazebo reference="hummingbird/rotor_1">
     <material>Gazebo/Blue</material>
-  </gazebo> -->
+  </gazebo>
   
 <joint name="hummingbird/rotor_2_joint" type="continuous">
     <origin rpy="0 0 0" xyz="-0.17 0 0.01"/>
@@ -191,7 +191,7 @@
     </collision>
   </link>
 
-  <!-- <gazebo>
+  <gazebo>
     <plugin filename="librotors_gazebo_motor_model.so" name="hummingbird_back_motor_model">
       <robotNamespace>hummingbird</robotNamespace>
       <jointName>hummingbird/rotor_2_joint</jointName>
@@ -212,7 +212,7 @@
   </gazebo>
   <gazebo reference="hummingbird/rotor_2">
     <material>Gazebo/Blue</material>
-  </gazebo> -->
+  </gazebo>
 
   <joint name="hummingbird/rotor_3_joint" type="continuous">
     <origin rpy="0 0 0" xyz="0 -0.17 0.01"/>
@@ -242,7 +242,7 @@
     </collision>
   </link>
 
-  <!-- <gazebo>
+  <gazebo>
     <plugin filename="librotors_gazebo_motor_model.so" name="hummingbird_right_motor_model">
       <robotNamespace>hummingbird</robotNamespace>
       <jointName>hummingbird/rotor_3_joint</jointName>
@@ -263,7 +263,7 @@
   </gazebo>
   <gazebo reference="hummingbird/rotor_3">
     <material>Gazebo/Blue</material>
-  </gazebo> -->
+  </gazebo>
 
 </robot>
 
