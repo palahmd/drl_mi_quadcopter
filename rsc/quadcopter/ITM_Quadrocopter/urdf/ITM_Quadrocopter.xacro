@@ -6,7 +6,7 @@
 
 <robot name="ITM_Quadrocopter" xmlns:xacro="http://ros.org/wiki/xacro">
     <!-- Properties of the ITM_Quadrocopter -->
-    <xacro:property name="namespace" value="$(arg namespace)" />
+    <xacro:property name="namespace" value="ITM_Quadcopter" />
     <xacro:property name="rotor_velocity_slowdown_sim" value="10" />    
     <xacro:property name="use_mesh_file" value="true" />
     <xacro:property name="mesh_file" value="package://rotors_description/meshes/test2.dae" />
