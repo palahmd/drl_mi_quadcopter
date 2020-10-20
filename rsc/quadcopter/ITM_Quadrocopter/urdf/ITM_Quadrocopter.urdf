@@ -8,6 +8,11 @@
     Values from file named "trägheitsmomente_quadrocopter.dat"
 -->
 <robot name="ITM_Quadrocopter">
+
+      <material name="blue">
+        <color rgba="0.0 0.0 0.8 1.0"/>
+      </material>
+
   <!-- [m] -->
   <!-- Following values are not edited because of missing informations -->
   <link name="ITM_Quadcopter/base_link"/>
@@ -24,9 +29,10 @@
       <inertia ixx="6.687e-03" ixy="-2.4e-04" ixz="3.467e-04" iyy="1.01e-02" iyz="1.458e-04" izz="9.96e-03"/>
     </inertial>
     <visual>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <origin rpy="0 0 0" xyz="-0.14 -0.13 0"/>
       <geometry>
         <mesh filename="../meshes/ITM_Quadrocopter.dae" scale="1 1 1"/>
+      <material name="blue"/>
       </geometry>
     </visual>
     <collision>

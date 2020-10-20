@@ -23,6 +23,7 @@
   limitations under the License.
 -->
 
+
 <robot name="hummingbird">
   <link name="hummingbird/base_link"/>
   <joint name="hummingbird/base_joint" type="fixed">
@@ -42,6 +43,9 @@
       <geometry>
         <mesh filename="../meshes/hummingbird.dae" scale="1 1 1"/>
       </geometry>
+      <material name="blue">
+        <color rgba="0.0 0.0 0.8 1.0"/>
+      </material>
     </visual>
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0"/>
@@ -80,6 +84,7 @@
         <mesh filename="meshes/propeller_cw.dae" scale="0.1 0.1 0.1"/>
         <box size="${2*radius_rotor} 0.01 0.005"/>
       </geometry>
+      <material name="blue"/>
     </visual>
     <collision>
       <geometry>

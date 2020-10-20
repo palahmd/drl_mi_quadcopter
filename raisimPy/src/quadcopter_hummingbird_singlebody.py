@@ -15,7 +15,7 @@ dummy_mass_matrix = np.identity(3)
 
 quadcopter = world.add_mesh(quadcopter_urdf_file, 0.72, dummy_mass_matrix, np.array([0, 0, 0.12]), 1)
 quadcopter.set_name("Hummingbird")
-quadcopter.set_position(0 , 0 , 5)
+quadcopter.set_position(0 , 0 , 0)
 
 
 server.launch_server(8080)
