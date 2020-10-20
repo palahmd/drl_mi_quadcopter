@@ -13,7 +13,7 @@ ground = world.add_ground()
 
 dummy_mass_matrix = np.identity(3)
 
-quadcopter = world.add_mesh(quadcopter_urdf_file, 1.7, dummy_mass_matrix, np.array([0.05, 0.05, 0.135]), 1)
+quadcopter = world.add_mesh(quadcopter_urdf_file, 1.7, dummy_mass_matrix, np.array([0, 0, 0.135]), 1)
 quadcopter.set_name("ITM_Quadcopter")
 quadcopter.set_position(0, 0, 5)
 
