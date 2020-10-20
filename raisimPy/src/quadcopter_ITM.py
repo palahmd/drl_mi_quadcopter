@@ -13,7 +13,7 @@ ground = world.add_ground()
 
 quadcopter = world.add_articulated_system(quadcopter_urdf_file)
 quadcopter.set_name("ITM_Quadcopter")
-quadcopter_nominal_joint_config = np.array([0.1, 0.1, 0.1433, 1.0, 0.0, 0.0, 0.0, 0, 0, 0, 0])
+quadcopter_nominal_joint_config = np.array([0, 0, 0.1433, 1.0, 0.0, 0.0, 0.0, 0, 0, 0, 0])
 quadcopter.set_generalized_coordinates(quadcopter_nominal_joint_config)
 
 
