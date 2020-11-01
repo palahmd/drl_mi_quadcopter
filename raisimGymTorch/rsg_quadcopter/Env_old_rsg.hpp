@@ -211,6 +211,28 @@ class ENVIRONMENT : public RaisimGymEnv {
       hummingbird_->setExternalForce(0, force_W);
       hummingbird_->setExternalTorque(0, torque_W);
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
       world_->integrate();
 
       if (visualizable_ && visualizeThisStep_ && visualizationCounter_ % visDecimation == 0)

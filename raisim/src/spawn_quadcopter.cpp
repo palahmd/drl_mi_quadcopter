@@ -1,43 +1,58 @@
 #include "raisim/World.hpp"
 #include "raisim/RaisimServer.hpp"
 #include "Eigen/Dense"
+#include "iostream"
 
 
 int main(int argc, char* argv[]) {
   auto binaryPath = raisim::Path::setFromArgv(argv[0]);
   raisim::World::setActivationKey( binaryPath.getDirectory() + "\\rsc\\activation.raisim");
-
   raisim::World world;
-  world.setTimeStep(0.002);
+  world.setTimeStep(0.002); // what does timestep do and why does the sim. go slower when timestep is changed
 
+  /// create raisim objects
   auto ground = world.addGround();
   auto quadcopter = world.addArticulatedSystem(binaryPath.getDirectory() + "\\rsc\\quadcopter\\ITM_Quadrocopter\\urdf\\ITM_Quadrocopter.urdf");
+  quadcopter->setName("Quaddy");
 
-  int gcDim_ = quadcopter->getGeneralizedCoordinateDim();
-  int gvDim_ = quadcopter->getDOF();
-  int nRotors_ = gvDim_ - 6;
+  //quadcopter model parameters
+  const double rotorPos = 0.17104913036744201, momentConst = 0.016;
+  const double k_f = 6.11*pow(10,-8), k_m = 1.5*pow(10,-9); //in rpm²
+  const double rps = 2*M_PI, rps2rpm = rps*60;
+
+  // initialize general coordinates, velocities and number of rotors
+  int gcDim = quadcopter->getGeneralizedCoordinateDim();
+  int gvDim = quadcopter->getDOF();
+  int nRotors = gvDim - 6;
 
   /// initialize containers
-  Eigen::VectorXd gc_init_, gv_init_, gc_, gv_, pTarget_, pTarget12_, vTarget_;
-  gc_.setZero(gcDim_); gc_init_.setZero(gcDim_);
-  gv_.setZero(gvDim_); gv_init_.setZero(gvDim_);
-  pTarget_.setZero(gcDim_); vTarget_.setZero(gvDim_); pTarget12_.setZero(nRotors_);
+  Eigen::VectorXd gc_init, gv_init, gc, gv, pTarget, pTarget12, vTarget;
+  gc.setZero(gcDim); gc_init.setZero(gcDim);
+  gv.setZero(gvDim); gv_init.setZero(gvDim);
+  pTarget.setZero(gcDim); vTarget.setZero(gvDim); pTarget12.setZero(nRotors);
 
   /// nominal configuration of quadcopter: [0]-[2]: center of mass, [3]-[6]: quanternions, [7]-[10]: rotors
-  gc_init_ << 0, 0, 0.1433, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
+  gc_init << 0, 0, 10.1433, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
+  gv_init << 0, 0, 0, 0, 2, 0, 0, 0, 0, 0;
+  quadcopter->setState(gc_init, gv_init);
 
-  /// for rotor movement simulation. Rotors have no mass
-  /*
-  quadcopter->setMass(1, 0);
-  quadcopter->setMass(2, 0);
-  quadcopter->setMass(3, 0);
-  quadcopter->setMass(4,0);
-  */
-  gv_init_ << 0, 0, 10, 0, 10, 0, -838, 838, 838, -838;
+  /// rotor thrusts and equivalent generated forces
+  Eigen::VectorXd thrusts;
+  Eigen::Matrix4d thrusts2EqForce;
+  thrusts.setZero(nRotors);
+  thrusts2EqForce << rotorPos, rotorPos, -rotorPos, -rotorPos,
+                    rotorPos, -rotorPos, -rotorPos, rotorPos,
+                    momentConst, momentConst, momentConst, momentConst,
+                    1, 1, 1, 1;
+  vTarget = thrusts.cast<double>();
+  Eigen::Vector4d testvector;
+  testvector << 1, 2, 3, 4;
 
-  quadcopter->setName("Quaddy");
-  quadcopter->setState(gc_init_, gv_init_);
-  quadcopter->setControlMode(raisim::ControlMode::FORCE_AND_TORQUE);
+  std::cout << testvector.segment(0,3) << std::endl;
+
+  /// set initial state and dynamics properties
+  quadcopter->setIntegrationScheme(raisim::ArticulatedSystem::IntegrationScheme::SEMI_IMPLICIT);
+  quadcopter->setControlMode(raisim::ControlMode::PD_PLUS_FEEDFORWARD_TORQUE);
   quadcopter->setGeneralizedForce({0, 0, 0, 0, 0, 0, 0, 0, 0, 0});
 
 
@@ -46,10 +61,31 @@ int main(int argc, char* argv[]) {
   server.launchServer();
   server.focusOn(quadcopter);
 
-    for (int i=0; i<20000; i++){
+ size_t f = 0;
+  for (int i=0; i<20000; i++){
+//    quadcopter->setExternalForce(1, raisim::ArticulatedSystem::Frame::BODY_FRAME,
+//                                 {0, 0, 5}, raisim::ArticulatedSystem::Frame::BODY_FRAME, {0, 0, 0});
+//    quadcopter->setExternalForce(2, raisim::ArticulatedSystem::Frame::BODY_FRAME,
+//                                   {0, 0, 5}, raisim::ArticulatedSystem::Frame::BODY_FRAME, {0, 0, 0});
+//    quadcopter->setExternalForce(3, raisim::ArticulatedSystem::Frame::BODY_FRAME,
+//                                   {0, 0, 6}, raisim::ArticulatedSystem::Frame::BODY_FRAME, {0, 0, 0});
+//    quadcopter->setExternalForce(4, raisim::ArticulatedSystem::Frame::BODY_FRAME,
+//                                   {0, 0, 5}, raisim::ArticulatedSystem::Frame::BODY_FRAME, {0, 0, 0});
+      // quadcopter->setExternalForce(0, {0, 0, 17.0});
+      quadcopter->getState(gc, gv);
+      gv[0] = 0, gv[1] = 0, gv[2] = 0, gv[3] = 0, gv[5] = 0;
+    if (f>1000) {
+
+        gv[6] = 1000;
+        gv[7] = -1000;
+        gv[8] = 1000;
+        gv[9] = -1000;
+
+    }
+      quadcopter->setGeneralizedVelocity(gv);
     raisim::MSLEEP(2);
     server.integrateWorldThreadSafe();
-    
+   f++;
   }
 
   server.killServer();

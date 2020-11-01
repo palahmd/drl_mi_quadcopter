@@ -51,41 +51,6 @@
   </link>
 
 
- 
-  <!-- 
-	rotor 0: counter-clockwise 
-  -->
-  
-<joint name="rotor_0_joint" type="continuous">
-    <origin rpy="0 0 0" xyz="0.17104913036744201 -0.17104913036744201 0.071"/>
-    <axis xyz="0 0 1"/>
-    <limit effort="2000" velocity="838" />
-    <parent link="base"/>
-    <child link="rotor_0"/>
-    <dynamics damping="0.0" friction="0.0"/>
-  </joint>
-
-  <link name="rotor_0">
-    <inertial>
-      <mass value="0.017"/>
-      <!-- [kg] -->
-      <inertia ixx="3.314998674e-06" ixy="0.0" ixz="0.0" iyy="0.00020412741834900002" iyz="0.0" izz="0.000207187417125"/>
-    </inertial>
-    <visual>
-      <geometry>
-	<mesh filename="../meshes/propeller_ccw.dae" scale="0.12 0.12 0.12"/>
-	<!-- The propeller meshes have a radius of 1m -->
-	<box size="0.24 0.01 0.005"/>
-      </geometry>
-    </visual>
-    <collision>
-      <geometry>
-	<cylinder length="0.005" radius="0.12"/>
-	<!-- [m] -->
-      </geometry>
-    </collision>
-  </link>
-
 
  <!-- 
 	rotor 1: clockwise 
@@ -122,21 +87,21 @@
   </link>
 
 
-
+ 
   <!-- 
 	rotor 2: counter-clockwise 
   -->
   
-  <joint name="rotor_2_joint" type="continuous">
-    <origin rpy="0 0 0" xyz="-0.17104913036744201 0.17104913036744201 0.071"/>
+<joint name="rotor_0_joint" type="continuous">
+    <origin rpy="0 0 0" xyz="0.17104913036744201 -0.17104913036744201 0.071"/>
     <axis xyz="0 0 1"/>
     <limit effort="2000" velocity="838" />
     <parent link="base"/>
-    <child link="rotor_2"/>
+    <child link="rotor_0"/>
     <dynamics damping="0.0" friction="0.0"/>
   </joint>
 
-  <link name="rotor_2">
+  <link name="rotor_0">
     <inertial>
       <mass value="0.017"/>
       <!-- [kg] -->
@@ -158,7 +123,8 @@
   </link>
 
 
-  <!-- 
+
+ <!-- 
 	rotor 3: clockwise 
   -->
   
@@ -192,7 +158,44 @@
     </collision>
   </link>
 
+
+
+  <!-- 
+	rotor 4: counter-clockwise 
+  -->
+  
+  <joint name="rotor_2_joint" type="continuous">
+    <origin rpy="0 0 0" xyz="-0.17104913036744201 0.17104913036744201 0.071"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="2000" velocity="838" />
+    <parent link="base"/>
+    <child link="rotor_2"/>
+    <dynamics damping="0.0" friction="0.0"/>
+  </joint>
+
+  <link name="rotor_2">
+    <inertial>
+      <mass value="0.017"/>
+      <!-- [kg] -->
+      <inertia ixx="3.314998674e-06" ixy="0.0" ixz="0.0" iyy="0.00020412741834900002" iyz="0.0" izz="0.000207187417125"/>
+    </inertial>
+    <visual>
+      <geometry>
+	<mesh filename="../meshes/propeller_ccw.dae" scale="0.12 0.12 0.12"/>
+	<!-- The propeller meshes have a radius of 1m -->
+	<box size="0.24 0.01 0.005"/>
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+	<cylinder length="0.005" radius="0.12"/>
+	<!-- [m] -->
+      </geometry>
+    </collision>
+  </link>
+
 </robot>
+
 
  <!-- rotors_simulator gazebo plugin parameters for rotor 1
       <robotNamespace>ITM_Quadcopter</robotNamespace>
