@@ -46,6 +46,8 @@ int main(int argc, char *argv[]) {
     server.launchServer();
     server.focusOn(robot);
 
+    /// desired Position
+    desiredPos = {0, 0, 10};
 
     for (int i = 0; i < 200000; i++) {
 
@@ -53,7 +55,7 @@ int main(int argc, char *argv[]) {
         calculateThrusts();
         applyThrusts();
 
-        std::cout << force_WorldFrame << std::endl;
+        std::cout << thrusts << std::endl;
 
         raisim::MSLEEP(2);
         server.integrateWorldThreadSafe();
