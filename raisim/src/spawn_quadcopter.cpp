@@ -28,10 +28,10 @@ int main(int argc, char *argv[]) {
     gc.setZero(gcDim); gc_init.setZero(gcDim); gv.setZero(gvDim); gv_init.setZero(gvDim);
     pTarget.setZero(gcDim); vTarget.setZero(gvDim); pTarget12.setZero(nRotors);
 
-    /// initialize state and nominal configuration: [0]-[2]: center of mass, [3]-[6]: quanternions, [7]-[10]: rotors
+    /// initialize state and nominal configuration: [0]-[2]: center of mass, [3]-[6]: quaternions, [7]-[10]: rotors
     /// also possible to set a reset() function
     gc_init << 0, 0, 0.135, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
-    gv_init << 0, 0, 0, 0, 0, 0, -2000*rpm, 2000*rpm, -2000*rpm, 2000*rpm; // rotor movement for visualization
+    gv_init << 0, 0, 0, 0, 0, 0, -4000*rpm, 4000*rpm, -4000*rpm, 4000*rpm; // rotor movement for visualization
     robot->setState(gc_init, gv_init);
 
     /// rotor thrusts and equivalent generated forces
@@ -48,6 +48,13 @@ int main(int argc, char *argv[]) {
 
 
     for (int i = 0; i < 200000; i++) {
+
+        updateState();
+        calculateThrusts();
+        applyThrusts();
+
+        std::cout << force_WorldFrame << std::endl;
+
         raisim::MSLEEP(2);
         server.integrateWorldThreadSafe();
     }
