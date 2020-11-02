@@ -4,22 +4,25 @@
     raisim::ArticulatedSystem* robot;
 
     // general coordinates, velocities and dynamics
-    Eigen::VectorXd gc_init, gv_init, gc, gv, pTarget, pTarget12, vTarget;
-    Eigen::Vector4d thrusts;
+    Eigen::VectorXd gc_init, gv_init, gc, gv, pTarget, pGain, dTarget, dGain vTarget;
+    Eigen::Vector4d thrusts, controlThrusts;
     Eigen::Matrix4d thrusts2EqForce;
     int gvDim, gcDim, nRotors;
 
     raisim::Mat<3,3> rot;
-    raisim::Vec<3> pos, linVel, angVel;
+    raisim::Vec<3> pos, linVel, angVel, desiredPos;
+    double errorPos;
     
     Eigen::Vector4d EqForce;
     Eigen::Vector3d torque_BaseFrame, force_BaseFrame;
     raisim::Vec<3> torque_WorldFrame, force_WorldFrame;
+
     
     // quadcopter model parameters
     const double rotorPos = 0.17104913036744201, momentConst = 0.016;
     const double rps = 2 * M_PI, rpm = rps/60;
     const double max_thrust_i = 8;
+    const Eigen::Vector4d lavitateThrusts = {1.727/4*9.81, 1.727/4*9.81, 1.727/4*9.81, 1.727/4*9.81};
 
 
 void updateState(){
@@ -30,7 +33,13 @@ void updateState(){
 }
 
 void calculateThrusts(){
-    thrusts = {4.5, 4.5, 4.5, 4.5};
+    Eigen::Vector3d hilf1 = desiredPos.e() - pos.e();
+    Eigen::Vector3d hilf2 = {1, 1, 1};
+    errorPos = hilf1.transpose()*hilf2;
+
+    controlThrusts = 0.01*errorPos*lavitateThrusts;
+
+    thrusts = lavitateThrusts + controlThrusts;
 }
 
 void applyThrusts(){
