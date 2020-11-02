@@ -1,6 +1,7 @@
 #include "raisim/World.hpp"
 #include "raisim/RaisimServer.hpp"
 #include "Eigen/Dense"
+#include "spawn_quadcopter.hpp"
 #include "iostream"
 
 
@@ -12,65 +13,45 @@ int main(int argc, char *argv[]) {
 
     /// create raisim objects
     auto ground = world.addGround();
-    auto quadcopter = world.addArticulatedSystem(
+    robot = world.addArticulatedSystem(
             binaryPath.getDirectory() + "\\rsc\\quadcopter\\ITM_Quadrocopter\\urdf\\ITM_Quadrocopter.urdf");
-    quadcopter->setName("Quaddy");
-
-    //quadcopter model parameters
-    const double rotorPos = 0.17104913036744201, momentConst = 0.016;
-    const double k_f = 6.11 * pow(10, -8), k_m = 1.5 * pow(10, -9); //in rpm²
-    const double rps = 2 * M_PI, rps2rpm = rps * 60;
+    robot->setName("Quaddy");
+    robot->setIntegrationScheme(raisim::ArticulatedSystem::IntegrationScheme::SEMI_IMPLICIT);
+    robot->setControlMode(raisim::ControlMode::PD_PLUS_FEEDFORWARD_TORQUE);
 
     // initialize general coordinates, velocities and number of rotors
-    int gcDim = quadcopter->getGeneralizedCoordinateDim();
-    int gvDim = quadcopter->getDOF();
-    int nRotors = gvDim - 6;
+    gcDim = robot->getGeneralizedCoordinateDim();
+    gvDim = robot->getDOF();
+    nRotors = gvDim - 6;
 
     /// initialize containers
-    Eigen::VectorXd gc_init, gv_init, gc, gv, pTarget, pTarget12, vTarget;
     gc.setZero(gcDim); gc_init.setZero(gcDim); gv.setZero(gvDim); gv_init.setZero(gvDim);
     pTarget.setZero(gcDim); vTarget.setZero(gvDim); pTarget12.setZero(nRotors);
 
-    /// nominal configuration of quadcopter: [0]-[2]: center of mass, [3]-[6]: quanternions, [7]-[10]: rotors
-    gc_init << 0, 0, 0.1433, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
-    gv_init << 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
-    quadcopter->setState(gc_init, gv_init);
+    /// initialize state and nominal configuration: [0]-[2]: center of mass, [3]-[6]: quanternions, [7]-[10]: rotors
+    /// also possible to set a reset() function
+    gc_init << 0, 0, 0.135, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
+    gv_init << 0, 0, 0, 0, 0, 0, -2000*rpm, 2000*rpm, -2000*rpm, 2000*rpm; // rotor movement for visualization
+    robot->setState(gc_init, gv_init);
 
     /// rotor thrusts and equivalent generated forces
-    Eigen::VectorXd thrusts;
-    Eigen::Matrix4d thrusts2EqForce;
     thrusts.setZero(nRotors);
-    thrusts2EqForce << rotorPos, rotorPos, -rotorPos, -rotorPos,
-            rotorPos, -rotorPos, -rotorPos, rotorPos,
-            momentConst, momentConst, momentConst, momentConst,
+    thrusts2EqForce << rotorPos, -rotorPos, -rotorPos, rotorPos,
+            -rotorPos, -rotorPos, rotorPos, rotorPos,
+            momentConst, -momentConst, momentConst, -momentConst,
             1, 1, 1, 1;
-
-    /// set initial state and dynamics properties
-    quadcopter->setIntegrationScheme(raisim::ArticulatedSystem::IntegrationScheme::SEMI_IMPLICIT);
-    quadcopter->setControlMode(raisim::ControlMode::PD_PLUS_FEEDFORWARD_TORQUE);
-    quadcopter->setGeneralizedForce({0, 0, 0, 0, 0, 0, 0, 0, 0, 0});
-
 
     /// launch raisim server for visualization. Can be visualized on raisimUnity
     raisim::RaisimServer server(&world);
     server.launchServer();
-    server.focusOn(quadcopter);
+    server.focusOn(robot);
 
-    for (int i = 0; i < 20000; i++) {
 
-        // applying forces at every rotor in rotor frame
-        quadcopter->setExternalForce(1, raisim::ArticulatedSystem::Frame::BODY_FRAME,
-                                     {0, 0, 2.4}, raisim::ArticulatedSystem::Frame::BODY_FRAME, {0, 0, 0});
-        quadcopter->setExternalForce(2, raisim::ArticulatedSystem::Frame::BODY_FRAME,
-                                     {0, 0, 2.4}, raisim::ArticulatedSystem::Frame::BODY_FRAME, {0, 0, 0});
-        quadcopter->setExternalForce(3, raisim::ArticulatedSystem::Frame::BODY_FRAME,
-                                     {0, 0, 2.4}, raisim::ArticulatedSystem::Frame::BODY_FRAME, {0, 0, 0});
-        quadcopter->setExternalForce(4, raisim::ArticulatedSystem::Frame::BODY_FRAME,
-                                     {0, 0, 2}, raisim::ArticulatedSystem::Frame::BODY_FRAME, {0, 0, 0});
-
+    for (int i = 0; i < 200000; i++) {
         raisim::MSLEEP(2);
         server.integrateWorldThreadSafe();
     }
 
     server.killServer();
 }
+
