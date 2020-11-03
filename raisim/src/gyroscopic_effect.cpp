@@ -82,7 +82,7 @@ int main(int argc, char* argv[]) {
             gv[7] = -10000*rpm;
             gv[8] = 10000*rpm;
             gv[9] = -10000*rpm;
-            quadcopter->setExternalTorque(0, {0, 0.01, 0});
+             quadcopter->setExternalTorque(0, {0, 0.01, 0});
         }
         quadcopter->setGeneralizedVelocity(gv);
         raisim::MSLEEP(2);
