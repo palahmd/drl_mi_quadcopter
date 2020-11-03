@@ -1,8 +1,12 @@
+//
+// Created by pala on 25.10.20.
+//
+
 #include "raisim/World.hpp"
 #include "raisim/RaisimServer.hpp"
 #include "Eigen/Dense"
 
-#include "quadcopter_initializer.hpp"
+#include "quadcopter_init.hpp"
 #include "pid_controller.hpp"
 #include "iostream"
 
@@ -21,10 +25,12 @@ int main(int argc, char *argv[]) {
     robot->setIntegrationScheme(raisim::ArticulatedSystem::IntegrationScheme::RUNGE_KUTTA_4);
     robot->setControlMode(raisim::ControlMode::PD_PLUS_FEEDFORWARD_TORQUE);
 
-    // initialize general coordinates, general velocities and number of rotors
+    // initialize general coordinates, general velocities, number of rotors and observation vector
     gcDim = robot->getGeneralizedCoordinateDim();
     gvDim = robot->getDOF();
     nRotors = gvDim - 6;
+    int obDim = 18;
+    ob.setZero(obDim); ob_q.setZero(obDim-5);
 
     /// initialize containers
     gc.setZero(gcDim); gc_init.setZero(gcDim); gv.setZero(gvDim); gv_init.setZero(gvDim);
@@ -49,15 +55,24 @@ int main(int argc, char *argv[]) {
     server.focusOn(robot);
 
     /// desired Position
-    desiredPos = {0, 0, 10};
+    Eigen::VectorXd desiredPos;
+    desiredPos.setZero(obDim-6);
+    desiredPos << 0., 0., 0., // target euler angles
+                0.,  2.,  10., // target position Vector
+                0.,  0.,  0., // target linear Velocity Vector
+                0.,  0.,  0.; // target angular Velocity Vector
+
+            /// Visualize desired position
+    auto visPoint = server.addVisualSphere("visPoint", 0.25, 1, 0, 0);
+    visPoint->setPosition({0, 2, 10});
 
     for (int i = 0; i < 200000; i++) {
 
         updateState();
-        calculateThrusts();
+        pidController::calculateThrusts(desiredPos);
         applyThrusts();
 
-        std::cout << genForces << "/n" << std::endl;
+        //std::cout << rot << "/n" << std::endl;
 
         raisim::MSLEEP(2);
         server.integrateWorldThreadSafe();
