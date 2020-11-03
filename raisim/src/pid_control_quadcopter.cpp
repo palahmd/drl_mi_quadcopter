@@ -1,7 +1,9 @@
 #include "raisim/World.hpp"
 #include "raisim/RaisimServer.hpp"
 #include "Eigen/Dense"
-#include "spawn_quadcopter.hpp"
+
+#include "quadcopter_initializer.hpp"
+#include "pid_controller.hpp"
 #include "iostream"
 
 
@@ -16,27 +18,27 @@ int main(int argc, char *argv[]) {
     robot = world.addArticulatedSystem(
             binaryPath.getDirectory() + "\\rsc\\quadcopter\\ITM_Quadrocopter\\urdf\\ITM_Quadrocopter.urdf");
     robot->setName("Quaddy");
-    robot->setIntegrationScheme(raisim::ArticulatedSystem::IntegrationScheme::SEMI_IMPLICIT);
+    robot->setIntegrationScheme(raisim::ArticulatedSystem::IntegrationScheme::RUNGE_KUTTA_4);
     robot->setControlMode(raisim::ControlMode::PD_PLUS_FEEDFORWARD_TORQUE);
 
-    // initialize general coordinates, velocities and number of rotors
+    // initialize general coordinates, general velocities and number of rotors
     gcDim = robot->getGeneralizedCoordinateDim();
     gvDim = robot->getDOF();
     nRotors = gvDim - 6;
 
     /// initialize containers
     gc.setZero(gcDim); gc_init.setZero(gcDim); gv.setZero(gvDim); gv_init.setZero(gvDim);
-    pTarget.setZero(gcDim); vTarget.setZero(gvDim); pTarget12.setZero(nRotors);
+    genForces.setZero(gcDim);
+
 
     /// initialize state and nominal configuration: [0]-[2]: center of mass, [3]-[6]: quaternions, [7]-[10]: rotors
-    /// also possible to set a reset() function
     gc_init << 0, 0, 0.135, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
     gv_init << 0, 0, 0, 0, 0, 0, -4000*rpm, 4000*rpm, -4000*rpm, 4000*rpm; // rotor movement for visualization
     robot->setState(gc_init, gv_init);
 
     /// rotor thrusts and equivalent generated forces
     thrusts.setZero(nRotors);
-    thrusts2EqForce << rotorPos, -rotorPos, -rotorPos, rotorPos,
+    thrusts2TorquesAndForces << rotorPos, -rotorPos, -rotorPos, rotorPos,
             -rotorPos, -rotorPos, rotorPos, rotorPos,
             momentConst, -momentConst, momentConst, -momentConst,
             1, 1, 1, 1;
@@ -55,7 +57,7 @@ int main(int argc, char *argv[]) {
         calculateThrusts();
         applyThrusts();
 
-        std::cout << thrusts << std::endl;
+        std::cout << genForces << "/n" << std::endl;
 
         raisim::MSLEEP(2);
         server.integrateWorldThreadSafe();
