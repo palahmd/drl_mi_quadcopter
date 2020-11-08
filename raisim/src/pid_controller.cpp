@@ -22,7 +22,7 @@
 
         /// P, D and I gain
         pGain = 20;
-        dGain = 15;
+        dGain = 30;
         iGain = 0.1;
 
 
