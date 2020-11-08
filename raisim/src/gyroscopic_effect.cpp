@@ -37,7 +37,7 @@ int main(int argc, char* argv[]) {
 
     /// nominal configuration of quadcopter: [0]-[2]: center of mass, [3]-[6]: quanternions, [7]-[10]: rotors
     gc_init << 0, 0, 10.1433, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
-    gv_init << 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+    gv_init << 0, 0, 0, 0, 10, 0, 0, 0, 0, 0;
     quadcopter->setState(gc_init, gv_init);
 
     /// rotor thrusts and equivalent generated forces
@@ -80,13 +80,13 @@ int main(int argc, char* argv[]) {
         quadcopter->getState(gc, gv);
         gv[0] = 0, gv[1] = 0, gv[2] = 0, gv[3] = 0, gv[5] = 0;
 
-        if (f>1) {
+        if (f>2000) {
 
             gv[6] = 10000*rpm;
             gv[7] = -10000*rpm;
             gv[8] = 10000*rpm;
             gv[9] = -10000*rpm;
-             quadcopter->setExternalTorque(0, {0, 0.01, 0});
+           //  quadcopter->setExternalTorque(0, {0, 0.01, 0});
         }
         quadcopter->setGeneralizedVelocity(gv);
         raisim::MSLEEP(2);
