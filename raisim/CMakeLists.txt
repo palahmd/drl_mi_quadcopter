@@ -12,7 +12,7 @@ include_directories (${EIGEN3_INCLUDE_DIRS})
 # make sure activation.raisim file and all models are in here
 file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/../rsc" DESTINATION ${CMAKE_BINARY_DIR})
 
-add_executable(pid_control_quadcopter src/pid_control_quadcopter.cpp)
+add_executable(pid_control_quadcopter src/quadcopter_pid_control.cpp)
 target_link_libraries(pid_control_quadcopter PUBLIC raisim::raisim pthread)
 target_include_directories(pid_control_quadcopter PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
