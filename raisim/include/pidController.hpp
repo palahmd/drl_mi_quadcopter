@@ -3,22 +3,25 @@
 //
 #ifndef QUADCOPTER_PIDCONTROLLER_HPP
 #define QUADCOPTER_PIDCONTROLLER_HPP
+
 #include "Eigen/Dense"
 
-class pidController{
+class pidController {
 public:
+    pidController(double P, double I, double D);
 
-    static void calculateThrusts(const Eigen::VectorXd& desiredPos);
+    void smallAnglesController();
+    void setTargetPoint(double x, double y, double z);
+    void visualizeTarget();
 
+    Eigen::VectorXd targetPoint;
 private:
-//    static Eigen::Vector3d eulerAngles;
-//    static Eigen::VectorXd currState;
-//    static Eigen::VectorXd errState;
-//    static Eigen::VectorXd errPos;
-//    static Eigen::Vector3d desiredAcc, desiredVel, desiredAng;
-//    static Eigen::Vector4d controlThrusts;
-//
-//    static int pGain, dGain, iGain;
+    Eigen::Vector3d eulerAngles, angVel_Body, desAcc;
+    Eigen::VectorXd currState; //pos, eulerAngles, linVel, angVel
+    Eigen::VectorXd errState; //pos, eulerAngles, linVel, angVel
+    Eigen::VectorXd desState; //pos, eulerAngles, linVel, angVel
+    Eigen::Vector4d u;
+    double pGain, dGain, iGain;
 };
 
 #endif //QUADCOPTER_PIDCONTROLLER_HPP
