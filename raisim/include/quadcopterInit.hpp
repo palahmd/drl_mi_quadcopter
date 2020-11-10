@@ -8,16 +8,18 @@
 #include "Eigen/Dense"
 #include "raisim/World.hpp"
 
+    /// declare raisim world, server and objects
     raisim::Ground* ground;
     raisim::ArticulatedSystem* robot;
     double timeStep = 0.002;
 
     /// generalized coordinates, generalized velocities and state
-    Eigen::VectorXd gc_init, gv_init, gc, gv;
+    Eigen::VectorXd gc_init, gv_init, gc, gv, gc_last;
     int gvDim, gcDim, nRotors, obDim;
-    raisim::Mat<3,3> rot;
+    raisim::Mat<3,3> rot, Inertia;
     raisim::Vec<3> pos, linVel_W, angVel_W, linAcc_W, angAcc_W;
     Eigen::VectorXd ob, ob_q;
+
 
     /// thrusts and forces
     Eigen::Vector4d thrusts;
@@ -34,7 +36,7 @@
     const double g = 9.81, m = 1.727;
     const double hoverThrust_i = m * g / 4;
     const Eigen::Vector4d hoverThrusts = {hoverThrust_i, hoverThrust_i, hoverThrust_i, hoverThrust_i};
-
+    const Eigen::Vector3d InertiaVec = {0.006687, 0.0101, 0.00996};
 
 /// Basic Functions
 void updateState() {
@@ -46,6 +48,7 @@ void updateState() {
     /// World Frame accelerations. gc and gv are from the last time step
     linAcc_W = (linVel_W.e() - gv.head(3)) / timeStep;
     angAcc_W = (angVel_W.e() - gv.segment(3, 3)) / timeStep;
+    gc_last = gc;
 
     /// get gc and gv from this time step for the next iteration
     robot->getState(gc, gv);
