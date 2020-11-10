@@ -20,7 +20,7 @@ private:
     Eigen::VectorXd currState; //pos, eulerAngles, linVel, angVel
     Eigen::VectorXd errState; //pos, eulerAngles, linVel, angVel
     Eigen::VectorXd desState; //pos, eulerAngles, linVel, angVel
-    Eigen::Vector4d u;
+    Eigen::Vector4d u, controlThrusts;
     double pGain, dGain, iGain;
 };
 

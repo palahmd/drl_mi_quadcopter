@@ -26,7 +26,7 @@
     Eigen::Matrix4d thrusts2TorquesAndForces;
     Eigen::Vector4d torquesAndForces;
     Eigen::Vector3d torques_baseFrame, forces_baseFrame;
-    raisim::Vec<3> torques_worldFrame, forces_worldFrame;
+    raisim::Vec<3> torques_worldFrame, forces_worldFrame, torques_worldFrame_2, forces_worldFrame_2;
     Eigen::VectorXd genForces;
 
 
@@ -92,11 +92,11 @@ void applyThrusts(){
 
     torques_worldFrame.e() = rot.e() * torques_baseFrame;
     forces_worldFrame.e() = rot.e() * forces_baseFrame;
-    genForces.head(6) << forces_worldFrame.e(), torques_worldFrame.e();
 
+    // genForces.head(6) << forces_worldFrame.e(), torques_worldFrame.e();
     // robot->setGeneralizedForce(genForces);
 
-    /// also possible to put an external force, to vis. forces and torque
+    /// to visualize force and torque vector, use external force instead of generalized
     robot->setExternalForce(0, forces_worldFrame);
     robot->setExternalTorque(0, torques_worldFrame);
 }
