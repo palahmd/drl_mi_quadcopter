@@ -53,7 +53,7 @@ int main(int argc, char *argv[]) {
             momConst, -momConst, momConst, -momConst;
 
     /// set PID Controller and desired Position for waypoint tracking
-    pidController pid(0.5, 50, 1.2);
+    pidController pid(0.5, 10, 1.5);
     pid.setTargetPoint(10, 10, 10);
 
     /// launch raisim server for visualization. Can be visualized on raisimUnity
