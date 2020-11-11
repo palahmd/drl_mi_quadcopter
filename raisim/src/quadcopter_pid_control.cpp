@@ -8,6 +8,7 @@
 #include "quadcopterInit.hpp"
 #include "pid_controller.cpp"
 #include "iostream"
+#include "benchmarkCommon.hpp"
 
 
 int main(int argc, char *argv[]) {
@@ -53,8 +54,8 @@ int main(int argc, char *argv[]) {
             momConst, -momConst, momConst, -momConst;
 
     /// set PID Controller and desired Position for waypoint tracking
-    pidController pid(0.5, 10, 1.5);
-    pid.setTargetPoint(10, 10, 10);
+    pidController pid(2, 20, 6);
+    pid.setTargetPoint(100, 10, 10);
 
     /// launch raisim server for visualization. Can be visualized on raisimUnity
     server.launchServer();
@@ -63,16 +64,29 @@ int main(int argc, char *argv[]) {
     auto visPoint = server.addVisualSphere("visPoint", 0.25, 1, 0, 0);
     visPoint->setPosition(pid.targetPoint.head(3));
 
+    auto begin = std::chrono::steady_clock::now();
     /// Integration loop
-    size_t i;
-    for (i = 0; i < 200000; i++) {
+    int i;
+    loopCount = 5;
+    for (i = 0; i < 20000; i++) {
         updateState();
         pid.smallAnglesController();
         applyThrusts();
 
+        if (loopCount > 4){
+            loopCount = 0;
+        }
+        loopCount++;
+
+        std::cout << gv.head(3) << "\n -------";
+
         raisim::MSLEEP(2);
         server.integrateWorldThreadSafe();
+
     }
+    std::cout << i << std::endl;
+    auto end = std::chrono::steady_clock::now();
+    raisim::print_timediff(i,begin,end);
 
     server.killServer();
 }

@@ -25,21 +25,25 @@ void pidController::smallAnglesController() {
     desState = targetPoint;
     errState = targetPoint - currState;
 
-    /** outer PID controller for Position Control
+    /** outer PID controller for Position Control with 100 Hz
      ** input: error between target point and current state
      ** output: desired acceleration, desired pitch and roll angles and u[0] for altitude control **/
-    desAcc = pGain * errState.segment(0, 3) + dGain * errState.segment(6, 3);
-    desState[3] = 1 / g * (desAcc[0] * sin(currState[5]) - desAcc[1] * cos(currState[5]));
-    desState[4] = 1 / g * (desAcc[0] * cos(currState[5]) + desAcc[1] * sin(currState[5]));
-    u[0] = m * g + m * desAcc[2] + m * iGain * errState[2] * timeStep;
+    if (loopCount > 4) {
+        desAcc = pGain * errState.segment(0, 3) + dGain * errState.segment(6, 3);
+        desState[3] = 1 / g * (desAcc[0] * sin(currState[5]) - desAcc[1] * cos(currState[5]));
+        desState[4] = 1 / g * (desAcc[0] * cos(currState[5]) + desAcc[1] * sin(currState[5]));
+        u[0] = m * g + m * desAcc[2] + m * iGain * errState[2] * timeStep;
+    } else {
+        u[0] = u[0];
+    }
 
-    /** inner PID controller for Attitude Control
+    /** inner PID controller for Attitude Control with 500 Hz
      ** input: desired acceleration, desired State and current state
      ** output: u[1] - u[3] for attitude control **/
     errState = desState - currState;
-    u[1] = pGain / 2 * errState[3] + dGain / 20 * errState[9] + iGain  * errState[3] * timeStep;
-    u[2] = pGain / 2 * errState[4] + dGain / 20 * errState[10] + iGain  * errState[4] * timeStep;
-    u[3] = pGain / 2 * errState[5] + dGain / 20 * errState[11] + iGain  * errState[5] * timeStep;
+    u[1] = pGain / 2 * errState[3] + dGain / 20 * errState[9] + iGain * errState[3] * timeStep;
+    u[2] = pGain / 2 * errState[4] + dGain / 20 * errState[10] + iGain * errState[4] * timeStep;
+    u[3] = pGain / 2 * errState[5] + dGain / 20 * errState[11] + iGain * errState[5] * timeStep;
 
     /** the input u is the desired input needed to reach the desired state,
      ** thus it has to be transformed into each rotor controlThrusts **/
@@ -69,7 +73,7 @@ void pidController::smallAnglesController() {
          }
      }
 
-    std::cout << timeStep/0.025*(controlThrusts[0]-thrusts[0]) << "\n ___ " << std::endl;
+   //std::cout << timeStep/0.025*(controlThrusts[0]-thrusts[0]) << "\n ___ " << std::endl;
 }
 
 void pidController::setTargetPoint(double x, double y, double z){
