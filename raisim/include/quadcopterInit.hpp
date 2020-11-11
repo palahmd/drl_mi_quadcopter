@@ -11,7 +11,7 @@
     /// declare raisim world, server and objects
     raisim::Ground* ground;
     raisim::ArticulatedSystem* robot;
-    double timeStep = 0.002;
+    double timeStep = 0.002; // the time step is too small, you can set the update rate at about 100 Hz (0.01s)
 
     /// generalized coordinates, generalized velocities and state
     Eigen::VectorXd gc_init, gv_init, gc, gv, gc_last;
