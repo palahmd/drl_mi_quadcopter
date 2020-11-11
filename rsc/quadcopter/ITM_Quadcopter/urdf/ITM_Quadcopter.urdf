@@ -45,8 +45,6 @@
     <inertial>
       <origin xyz="0 0 0"/>
       <mass value="1.659"/>
-      <!-- original values for: ixy="-2.4e-04" ixz="3.467e-04" iyz="1.458e-04". 
-	   but here: ixy=ixz=iyz=0 -->
       <inertia ixx="6.687e-03" ixy="-2.4e-04" ixz="3.467e-04" iyy="1.01e-02" iyz="1.458e-04" izz="9.96e-03"/>
     </inertial>
   </link>
