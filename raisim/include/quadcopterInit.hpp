@@ -30,6 +30,9 @@
     Eigen::VectorXd genForces;
 
 
+    size_t loopCount;
+
+
     /// quadcopter model parameters
     const double rotorPos = 0.17104913036744201, momConst = 0.016;
     const double rps = 2 * M_PI, rpm = rps/60;
@@ -93,12 +96,16 @@ void applyThrusts(){
     torques_worldFrame.e() = rot.e() * torques_baseFrame;
     forces_worldFrame.e() = rot.e() * forces_baseFrame;
 
-    // genForces.head(6) << forces_worldFrame.e(), torques_worldFrame.e();
-    // robot->setGeneralizedForce(genForces);
+    genForces.head(6) << forces_worldFrame.e(), torques_worldFrame.e();
+    robot->setGeneralizedForce(genForces);
 
     /// to visualize force and torque vector, use external force instead of generalized
-    robot->setExternalForce(0, forces_worldFrame);
-    robot->setExternalTorque(0, torques_worldFrame);
+    // robot->setExternalForce(0, forces_worldFrame);
+    // robot->setExternalTorque(0, torques_worldFrame);
+}
+
+void applyDragForces(){
+
 }
 
 #endif //QUADCOPTER_INIT_HPP

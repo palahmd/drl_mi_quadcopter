@@ -30,13 +30,13 @@
 
 namespace raisim {
 
-void print_timediff(const char *prefix, int loopCount,
+void print_timediff(int loopCount,
                     const std::chrono::steady_clock::time_point &start,
                     const std::chrono::steady_clock::time_point &end) {
   double milliseconds =
-      std::chrono::duration_cast<std::chrono::milliseconds>(end - start)
-          .count();
-  std::cout<<"The simulation of "<<prefix<<" is running at: "<<loopCount / milliseconds<<" kHz\n";
+      std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+  std::cout<<"The simulation"<<" is running at: "<<loopCount / milliseconds<<" kHz\n"
+            << "and " << milliseconds / loopCount << "ms per iteration";
 }
 }
 
