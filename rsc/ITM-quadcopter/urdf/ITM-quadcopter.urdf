@@ -20,7 +20,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-	<mesh filename="../meshes/ITM_Quadcopter.dae" scale="1 1 1"/>
+	<mesh filename="../meshes/ITM-quadcopter.dae" scale="1 1 1"/>
       </geometry>
     </visual>
     <collision>
