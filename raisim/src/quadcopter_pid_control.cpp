@@ -21,7 +21,7 @@ int main(int argc, char *argv[]) {
     /// create raisim objects
     ground = world.addGround(0, "rubber");
     robot = world.addArticulatedSystem(
-            binaryPath.getDirectory() + "\\rsc\\ITM_Quadcopter\\urdf\\ITM_Quadcopter.urdf");
+            binaryPath.getDirectory() + "\\rsc\\ITM-quadcopter\\urdf\\ITM-quadcopter.urdf");
     robot->setName("Quaddy");
     robot->setIntegrationScheme(raisim::ArticulatedSystem::IntegrationScheme::RUNGE_KUTTA_4);
 
