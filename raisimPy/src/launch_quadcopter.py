@@ -4,7 +4,7 @@ import raisimpy as raisim
 import time
 
 raisim.World.set_license_file(os.path.dirname(os.path.abspath(__file__)) + "/../../rsc/activation.raisim")
-quadcopter_urdf_file = os.path.dirname(os.path.abspath(__file__)) + "/../../rsc/quadcopter/ITM_Quadrocopter/urdf/ITM_Quadrocopter.urdf"
+quadcopter_urdf_file = os.path.dirname(os.path.abspath(__file__)) + "/../../rsc/ITM_Quadrocopter/urdf/ITM_Quadrocopter.urdf"
 
 world = raisim.World()
 world.set_time_step(0.001)
