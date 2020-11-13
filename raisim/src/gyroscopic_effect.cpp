@@ -16,7 +16,7 @@ int main(int argc, char* argv[]) {
 
     /// create raisim objects
     auto ground = world.addGround();
-    auto quadcopter = world.addArticulatedSystem(binaryPath.getDirectory() + "\\rsc\\quadcopter\\ITM_Quadrocopter\\urdf\\ITM_Quadrocopter.urdf");
+    auto quadcopter = world.addArticulatedSystem(binaryPath.getDirectory() + "\\rsc\\ITM_Quadrocopter\\urdf\\ITM_Quadrocopter.urdf");
     quadcopter->setName("Quaddy");
 
     //quadcopter model parameters

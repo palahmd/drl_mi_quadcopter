@@ -10,9 +10,9 @@ class pidController {
 public:
     pidController(double P, double I, double D);
 
-    void smallAnglesController();
+    void smallAnglesControl();
+
     void setTargetPoint(double x, double y, double z);
-    void visualizeTarget();
 
     Eigen::VectorXd targetPoint;
 private:

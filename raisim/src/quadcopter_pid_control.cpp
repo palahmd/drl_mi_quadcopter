@@ -4,10 +4,10 @@
 #include "raisim/World.hpp"
 #include "raisim/RaisimServer.hpp"
 #include "Eigen/Dense"
+#include "iostream"
 
 #include "quadcopterInit.hpp"
 #include "pid_controller.cpp"
-#include "iostream"
 #include "benchmarkCommon.hpp"
 
 
@@ -19,9 +19,9 @@ int main(int argc, char *argv[]) {
     world.setTimeStep(timeStep);
 
     /// create raisim objects
-    ground = world.addGround();
+    ground = world.addGround(0, "rubber");
     robot = world.addArticulatedSystem(
-            binaryPath.getDirectory() + "\\rsc\\quadcopter\\ITM_Quadcopter\\urdf\\ITM_Quadcopter.urdf");
+            binaryPath.getDirectory() + "\\rsc\\ITM_Quadcopter\\urdf\\ITM_Quadcopter.urdf");
     robot->setName("Quaddy");
     robot->setIntegrationScheme(raisim::ArticulatedSystem::IntegrationScheme::RUNGE_KUTTA_4);
 
@@ -32,17 +32,11 @@ int main(int argc, char *argv[]) {
     obDim = 18;
 
     /// initialize containers
-    gc.setZero(gcDim);
-    gc_init.setZero(gcDim);
-    gv.setZero(gvDim);
-    gv_init.setZero(gvDim);
-    genForces.setZero(gcDim);
-    ob.setZero(obDim);
-    ob_q.setZero(obDim - 5);
-    gc_last.setZero(gcDim);
+    gc.setZero(gcDim); gc_init.setZero(gcDim); gv.setZero(gvDim); gv_init.setZero(gvDim);
+    genForces.setZero(gcDim); ob.setZero(obDim); ob_q.setZero(obDim - 5);
 
     /// initialize state and nominal configuration: [0]-[2]: center of mass, [3]-[6]: quaternions, [7]-[10]: rotors
-    gc_init << 0, 0, 0.135, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
+    gc_init << 0, 0, 0.135, 1, 0, 0, 0, 0.0, 0.0, 0.0, 0.0;
     gv_init << 0, 0, 0, 0, 0, 0, -4000 * rpm, 4000 * rpm, -4000 * rpm, 4000 * rpm; // rotor movement for visualization
     robot->setState(gc_init, gv_init);
 
@@ -55,36 +49,36 @@ int main(int argc, char *argv[]) {
 
     /// set PID Controller and desired Position for waypoint tracking
     pidController pid(2, 20, 6);
-    pid.setTargetPoint(100, 10, 10);
+    pid.setTargetPoint(0, 10, 10);
+
+    auto visPoint = server.addVisualSphere("visPoint", 0.25, 0, 0.8, 0);
+    visPoint->setPosition(pid.targetPoint.head(3));
 
     /// launch raisim server for visualization. Can be visualized on raisimUnity
     server.launchServer();
     server.focusOn(robot);
+    raisim::MSLEEP(1000); // freeze for 1 sec
 
-    auto visPoint = server.addVisualSphere("visPoint", 0.25, 1, 0, 0);
-    visPoint->setPosition(pid.targetPoint.head(3));
-
-    auto begin = std::chrono::steady_clock::now();
     /// Integration loop
-    int i;
+    auto begin = std::chrono::steady_clock::now();
     loopCount = 5;
+
     for (i = 0; i < 20000; i++) {
         updateState();
-        pid.smallAnglesController();
+        pid.smallAnglesControl();
         applyThrusts();
 
+        // Loop count for PID controller -> Position Controller running at 1/5 th of speed
         if (loopCount > 4){
             loopCount = 0;
         }
         loopCount++;
 
-        std::cout << gv.head(3) << "\n -------";
-
-        raisim::MSLEEP(2);
+        raisim::MSLEEP(10);
         server.integrateWorldThreadSafe();
-
     }
-    std::cout << i << std::endl;
+
+    /// Benchmark of the algorithms in the integration loop
     auto end = std::chrono::steady_clock::now();
     raisim::print_timediff(i,begin,end);
 
