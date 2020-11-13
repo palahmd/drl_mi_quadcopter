@@ -73,7 +73,6 @@ int main(int argc, char *argv[]) {
             loopCount = 0;
         }
         loopCount++;
-
         raisim::MSLEEP(10);
         server.integrateWorldThreadSafe();
     }
