@@ -25,7 +25,7 @@ int main(int argc, char *argv[]) {
     robot->setName("Quaddy");
     robot->setIntegrationScheme(raisim::ArticulatedSystem::IntegrationScheme::RUNGE_KUTTA_4);
 
-    /// initialize general coordinates, general velocities, number of rotors and observation vector dimension
+    /// define dimension of general coordinates, general velocities, number of rotors and observation vector
     gcDim = robot->getGeneralizedCoordinateDim();
     gvDim = robot->getDOF();
     nRotors = gvDim - 6;
@@ -40,24 +40,25 @@ int main(int argc, char *argv[]) {
     gv_init << 0, 0, 0, 0, 0, 0, -4000 * rpm, 4000 * rpm, -4000 * rpm, 4000 * rpm; // rotor movement for visualization
     robot->setState(gc_init, gv_init);
 
-    /// rotor thrusts and generated forces and torques
+    /// initialize rotor thrusts and conversion matrix for generated forces and torques
     thrusts.setZero(nRotors);
     thrusts2TorquesAndForces << 1, 1, 1, 1,
             rotorPos, -rotorPos, -rotorPos, rotorPos,
             -rotorPos, -rotorPos, rotorPos, rotorPos,
             momConst, -momConst, momConst, -momConst;
 
-    /// set PID Controller and desired Position for waypoint tracking
+    /// set PID Controller with desired Position for waypoint tracking
     pidController pid(2, 20, 6);
-    pid.setTargetPoint(0, 10, 10);
+    pid.setTargetPoint(100, 10, 10);
 
+    /// visualize target position
     auto visPoint = server.addVisualSphere("visPoint", 0.25, 0, 0.8, 0);
     visPoint->setPosition(pid.targetPoint.head(3));
 
     /// launch raisim server for visualization. Can be visualized on raisimUnity
     server.launchServer();
     server.focusOn(robot);
-    raisim::MSLEEP(1000); // freeze for 1 sec
+    raisim::MSLEEP(1000); // freeze for 1 sec in the beginning
 
     /// Integration loop
     auto begin = std::chrono::steady_clock::now();
@@ -68,7 +69,7 @@ int main(int argc, char *argv[]) {
         pid.smallAnglesControl();
         applyThrusts();
 
-        // Loop count for PID controller -> Position Controller running at 1/5 th of speed
+        // Loop count for PID controller -> Position Controller controls at every 5th time step
         if (loopCount > 4){
             loopCount = 0;
         }
