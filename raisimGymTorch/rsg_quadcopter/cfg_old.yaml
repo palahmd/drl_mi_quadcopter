@@ -7,7 +7,7 @@ environment:
   num_threads: 40
   simulation_dt: 0.0025
   control_dt: 0.01
-  max_time: 5.0
+  max_time: 15.0
 
   positionRewardCoeff: -0.002
 #  thrustRewardCoeff: -7e-6

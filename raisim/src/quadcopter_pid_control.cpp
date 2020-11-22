@@ -19,7 +19,7 @@ int main(int argc, char *argv[]) {
     world.setTimeStep(timeStep);
 
     /// create raisim objects
-    ground = world.addGround(0, "rubber");
+    ground = world.addGround();
     robot = world.addArticulatedSystem(
             binaryPath.getDirectory() + "\\rsc\\ITM-quadcopter\\urdf\\ITM-quadcopter.urdf");
     robot->setName("Quaddy");
