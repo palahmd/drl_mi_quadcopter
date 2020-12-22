@@ -69,6 +69,7 @@ for update in range(1000000):
     #reward_ll_sum = 0
     #done_sum = 0
     #average_dones = 0.
+    action = [1]
 
     if update %  cfg['environment']['eval_every_n'] == 0:
         print("Visualizing and evaluating the current policy")
