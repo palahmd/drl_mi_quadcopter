@@ -1,3 +1,3 @@
-cd ../rsg_quadcopter
+cd ../environments/quadcopter_pid
 python runner.py
-cd ../scripts
+cd ../../scripts
