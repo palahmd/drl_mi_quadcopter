@@ -94,21 +94,21 @@ public:
         pid.smallAnglesControl();
         applyThrusts();
         loopCount = 5;
+        if (loopCount > 4) loopCount = 0;
 
         for (int i = 0; i < int(control_dt_ / simulation_dt_ + 1e-10); i++) {
-            if (loopCount > 4) loopCount = 0;
             if (server_) server_->lockVisualizationServerMutex();
             world_->integrate();
             if (server_) server_->unlockVisualizationServerMutex();
-            loopCount++;
         }
+        loopCount++;
+        updateObservation();
 
-        updateState();
-
+        return 1.0;
     }
     
     
-    void updateState() {
+    void updateObservation() {
         robot_->getBasePosition(pos);
         robot_->getBaseOrientation(rot);
         robot_->getVelocity(0, linVel_W);  // bodyIdx: 0 = base
@@ -182,6 +182,8 @@ public:
     }
 
 
+public:
+
     pidController pid;
 
     double timeStep = 0.01;
@@ -210,7 +212,7 @@ public:
 
 private:
   int gcDim_, gvDim_, nRotors_;
-  bool visualizable_ = false;
+  bool visualizable_ = true;
   raisim::ArticulatedSystem* robot_;
   Eigen::VectorXd gc_init_, gv_init_, gc_, gv_, pTarget_, pTarget12_, vTarget_;
   double terminalRewardCoeff_ = -10.;
