@@ -90,7 +90,7 @@ void applyThrusts(){
     torques_worldFrame.e() = rot.e() * torques_baseFrame;
     forces_worldFrame.e() = rot.e() * forces_baseFrame;
 
-    genForces.head(6) << forces_worldFrame.e(), torques_worldFrame.e();
+    genForces << forces_worldFrame.e(), torques_worldFrame.e(), 0, 0, 0, 0;
     robot->setGeneralizedForce(genForces);
 
     /// this will visualize the applied forces and torques
@@ -99,6 +99,7 @@ void applyThrusts(){
 }
 
 void applyDragForces(){
+    /// TODO
 }
 
 #endif //QUADCOPTER_INIT_HPP

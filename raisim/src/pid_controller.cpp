@@ -4,6 +4,7 @@
 #include "pidController.hpp"
 #include "quaternionToEuler.hpp"
 #include "quadcopterInit.hpp"
+#include "iostream"
 
 pidController::pidController(double P, double I, double D) {
     this->pGain = P;
@@ -45,7 +46,25 @@ void pidController::smallAnglesControl() {
     u[2] = inertiaDiagVec[1] * 81 * errState[4] + 2 * inertiaDiagVec[1] * 9 * errState[10];
     u[3] = inertiaDiagVec[2] * 81 * errState[5] + 2 * inertiaDiagVec[2] * 9 * errState[11];
 
-    // scale controlThrusts and avoid thrusts out of range: 0.5 - 1.5 * hoverThrust
+
+    /** Motor Model for motor i:
+     **         time_constant_up = 0.0125 sec
+     **         time_const_down = 0.025 sec
+     **         thrust(t) = thrust(t-1) + (controlThrust(t-1) - thrust(t-1)) * timeStep/time_constant **/
+    for (int i = 0; i<4; i++){
+        if (thrusts[i]<controlThrusts[i]) {  // time constant for increasing rotor speed
+            thrusts[i] = thrusts[i] + (controlThrusts[i] - thrusts[i]) * timeStep / 0.0125;
+        } else if (thrusts[i]>controlThrusts[i]){   // time constant for decreasing rotor speed
+            thrusts[i] = thrusts[i] + (controlThrusts[i] - thrusts[i]) * timeStep / 0.025;
+        }
+    }
+
+    /** the input u for reaching the the desired state has to be transformed into each rotor thrust.
+     ** The control thrust from this time step will be partly applied in the next time step
+     ** due to the rotor velocity change delay in the motor model **/
+    controlThrusts = thrusts2TorquesAndForces.inverse() * u;
+
+    /// scale controlThrusts and avoid thrusts out of range: 0.5 - 1.5 * hoverThrust
     double max_scale = controlThrusts.maxCoeff();
     if (max_scale > 1.5 * hoverThrust){
         controlThrusts = 1.5 / max_scale * hoverThrust * controlThrusts;
@@ -55,23 +74,6 @@ void pidController::smallAnglesControl() {
             controlThrusts[i] = 0.5 * hoverThrust;
         }
     }
-
-    /** Motor Model for motor i:
-     **         time_constant_up = 0.0125 sec
-     **         time_const_down = 0.025 sec
-     **         thrust(t) = thrust(t-1) + (controlThrust(t-1) - thrust(t-1)) * timeStep/time_constant **/
-     for (int i = 0; i<4; i++){
-         if (thrusts[i]<controlThrusts[i]) {  // time constant for increasing rotor speed
-             thrusts[i] = thrusts[i] + (controlThrusts[i] - thrusts[i]) * timeStep / 0.0125;
-         } else if (thrusts[i]>controlThrusts[i]){   // time constant for decreasing rotor speed
-             thrusts[i] = thrusts[i] + (controlThrusts[i] - thrusts[i]) * timeStep / 0.025;
-         }
-     }
-
-    /** the input u for reaching the the desired state has to be transformed into each rotor thrust.
-     ** The control thrust from this time step will be partly applied in the next time step
-     ** due to the rotor velocity change delay in the motor model **/
-    controlThrusts = thrusts2TorquesAndForces.inverse() * u;
 }
 
 void pidController::setTargetPoint(double x, double y, double z){

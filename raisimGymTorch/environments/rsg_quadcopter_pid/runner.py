@@ -16,6 +16,8 @@ import datetime
 home_path = os.path.dirname(os.path.realpath(__file__)) + "/.."
 env_path = os.path.dirname(os.path.realpath(__file__))
 
+print(home_path)
+
 # config
 cfg = YAML().load(open(env_path + "/cfg.yaml", 'r'))
 

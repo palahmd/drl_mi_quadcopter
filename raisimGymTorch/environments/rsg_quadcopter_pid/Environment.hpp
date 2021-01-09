@@ -7,8 +7,8 @@
 #include <cstdint>
 #include <set>
 #include "../../RaisimGymEnv.hpp"
-#include "include/pidController.hpp"
-#include "include/pid_controller.cpp"
+// #include "include/pidController.hpp"
+// #include "include/pid_controller.cpp"
 
 namespace raisim {
 
@@ -51,8 +51,8 @@ public:
         obStd_.setZero(obDim_);
 
         /// set pd gains
-        pid = pidController(2,10,6);
-        pid.setTargetPoint(100, 10, 10);
+        // pid = pidController(2,10,6);
+        // pid.setTargetPoint(100, 10, 10);
 
         /// action & observation scaling
         actionMean_.setConstant(2.5);
@@ -68,16 +68,16 @@ public:
 
 
         /// Reward coefficients
-        READ_YAML(double, forwardVelRewardCoeff_, cfg["forwardVelRewardCoeff"])
-        READ_YAML(double, torqueRewardCoeff_, cfg["torqueRewardCoeff"])
+        // READ_YAML(double, forwardVelRewardCoeff_, cfg["forwardVelRewardCoeff"])
+        // READ_YAML(double, torqueRewardCoeff_, cfg["torqueRewardCoeff"])
 
         /// visualize if it is the first environment
         if (visualizable_) {
             server_ = std::make_unique<raisim::RaisimServer>(world_.get());
             server_->launchServer();
             server_->focusOn(robot_);
-            auto visPoint = server_->addVisualSphere("visPoint", 0.25, 0, 0.8, 0);
-            visPoint->setPosition(pid.targetPoint.head(3));
+            // auto visPoint = server_->addVisualSphere("visPoint", 0.25, 0, 0.8, 0);
+            // visPoint->setPosition(pid.targetPoint.head(3));
             raisim::MSLEEP(1000);
         }
     }
@@ -86,16 +86,15 @@ public:
 
     void reset() final {
         robot_->setState(gc_init_, gv_init_);
-        updateState();
+        updateObservation();
     }
 
     float step(const Eigen::Ref<EigenVec> &action) final {
         /// action scaling
-        pid.smallAnglesControl();
+       //  pid.smallAnglesControl();
         applyThrusts();
         loopCount = 5;
         if (loopCount > 4) loopCount = 0;
-
         for (int i = 0; i < int(control_dt_ / simulation_dt_ + 1e-10); i++) {
             if (server_) server_->lockVisualizationServerMutex();
             world_->integrate();
@@ -182,9 +181,7 @@ public:
     }
 
 
-public:
-
-    pidController pid;
+    // pidController pid;
 
     double timeStep = 0.01;
     int i, loopCount;
@@ -221,8 +218,6 @@ private:
   Eigen::VectorXd actionMean_, actionStd_, obDouble_, obMean_, obStd_;
   Eigen::Vector3d bodyLinearVel_, bodyAngularVel_;
   std::set<size_t> baseIndex_;
-
-
 
     
 };
