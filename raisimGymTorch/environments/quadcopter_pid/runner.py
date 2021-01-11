@@ -28,29 +28,56 @@ env = VecEnv(rsg_quadcopter_pid.RaisimGymEnv(home_path + "/../rsc", dump(cfg['en
 ob_dim = env.num_obs
 act_dim = env.num_acts
 
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+
 # save the configuration and other files
-#saver = ConfigurationSaver(log_dir=home_path + "/data/pidControl",
-                          # save_items=[env_path + "/cfg.yaml", env_path + "/Environment.hpp"])
+saver = ConfigurationSaver(log_dir=home_path + "/data/pidControl",
+                          save_items=[env_path + "/cfg.yaml", env_path + "/Environment.hpp"])
 
 # Training
 n_steps = math.floor(cfg['environment']['max_time'] / cfg['environment']['control_dt'])
 total_steps = n_steps * env.num_envs
 
+actor = ppo_module.Actor(ppo_module.MLP(cfg['architecture']['policy_net'],
+                                        nn.LeakyReLU,
+                                        ob_dim,
+                                        act_dim),
+                         ppo_module.MultivariateGaussianDiagonalCovariance(act_dim, 1.0),
+                         device)
+
+critic = ppo_module.Critic(ppo_module.MLP(cfg['architecture']['value_net'],
+                                          nn.LeakyReLU,
+                                          ob_dim,
+                                          1),
+                           device)
+
+ppo = PPO.PPO(actor=actor,
+              critic=critic,
+              num_envs=cfg['environment']['num_envs'],
+              num_transitions_per_env=n_steps,
+              num_learning_epochs=4,
+              gamma=0.996,
+              lam=0.95,
+              num_mini_batches=4,
+              device=device,
+              log_dir=saver.data_dir,
+              mini_batch_sampling='in_order',
+              )
+
 
 for update in range(1000000):
     start = time.time()
     env.reset()
-    action = np.arrange(0)
-
+    action = []
     env.turn_on_visualization()
-
     time.sleep(0.01)
 
     # actual training
     for step in range(n_steps):
         obs = env.observe()
-        #action = ppo.observe(obs)
-        rew, act = env.step(action)
+        action = ppo.observe(obs)
+        reward, dones = env.step(action)
 
 
     end = time.time()

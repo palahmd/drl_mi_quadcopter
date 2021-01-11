@@ -7,10 +7,7 @@
 #include <cstdint>
 #include <set>
 #include "../../RaisimGymEnv.hpp"
-// #include "include/pidController.hpp"
-// #include "include/pid_controller.cpp"
 #include <iostream>
-#include <math.h>
 
 namespace raisim {
 
@@ -47,9 +44,9 @@ public:
 
         /// nominal configuration of quadcopter: [0]-[2]: center of mass, [3]-[6]: quanternions, [7]-[10]: rotors
         gc_init_ << 0.0, 0.0, 0.135, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
-        // gv_init_ << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -4000 * rpm_, 4000 * rpm_, -4000 * rpm_, 4000 * rpm_;
+        gv_init_ << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -4000 * rpm_, 4000 * rpm_, -4000 * rpm_, 4000 * rpm_;
 
-        /// initialize rotor thrusts and conversion matrix for generated forces and torques
+        /// initialize rotor thrusts_ and conversion matrix for generated forces and torques
         thrusts_.setZero(nRotors_);
         thrusts2TorquesAndForces_ << 1, 1, 1, 1,
                 rotorPos_, -rotorPos_, -rotorPos_, rotorPos_,
@@ -90,7 +87,7 @@ public:
         thrusts_ = action.cast<double>();
         thrusts_ = thrusts_.cwiseProduct(actionStd_);
         thrusts_ += actionMean_;
-        // applyThrusts();
+        applyThrusts();
 
         for (int i = 0; i < int(control_dt_ / simulation_dt_ + 1e-10); i++) {
             if (server_) server_->lockVisualizationServerMutex();
@@ -98,7 +95,7 @@ public:
             if (server_) server_->unlockVisualizationServerMutex();
         }
 
-        // updateObservation();
+        updateObservation();
 
         rewards_.record("position", std::sqrt(bodyPos_.squaredNorm()));
         rewards_.record("thrust", thrusts_.squaredNorm());
@@ -107,8 +104,8 @@ public:
 
         return rewards_.sum();
     }
-    
-    
+
+
     void updateObservation() {
         /// get robot state and transform to body frame
         robot_->getBaseOrientation(worldRot_);
@@ -161,8 +158,8 @@ public:
         robot_->setGeneralizedForce(genForces_);
 
         /// this will visualize the applied forces and torques
-        // robot->setExternalForce(0, forces_worldFrame_);
-        // robot->setExternalTorque(0, torques_worldFrame_);
+        // robot_->setExternalForce(0, forces_worldFrame_);
+        // robot_->setExternalTorque(0, torques_worldFrame_);
     }
     bool isTerminalState(float& terminalReward) final {
         terminalReward = float(terminalRewardCoeff_);
@@ -200,7 +197,7 @@ private:
   Eigen::Vector4d actionMean_, actionStd_;
   std::set<size_t> baseIndex_;
   raisim::Reward rewards_;
-    
+
 };
 }
 
