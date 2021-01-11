@@ -1,5 +1,5 @@
 from ruamel.yaml import YAML, dump, RoundTripDumper
-from raisimGymTorch.env.bin import rsg_quadcopter_pid
+from raisimGymTorch.env.bin import rsg_quadcopter_ppo
 from raisimGymTorch.env.RaisimGymVecEnv import RaisimGymVecEnv as VecEnv
 from raisimGymTorch.helper.raisim_gym_helper import ConfigurationSaver
 import os
@@ -11,6 +11,7 @@ import torch.nn as nn
 import numpy as np
 import torch
 import datetime
+import argparse
 
 # configuration
 parser = argparse.ArgumentParser()
@@ -33,8 +34,9 @@ print(home_path)
 cfg = YAML().load(open(task_path + "/cfg.yaml", 'r'))
 
 # create environment from the configuration file
-env = VecEnv(rsg_quadcopter_pid.RaisimGymEnv(home_path + "/../rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'])
-
+print('upto here working');
+env = VecEnv(rsg_quadcopter_ppo.RaisimGymEnv(home_path + "/../rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'])
+print('upto here working 2');
 # shortcuts
 ob_dim = env.num_obs
 act_dim = env.num_acts

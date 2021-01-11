@@ -199,7 +199,7 @@ public:
     Eigen::VectorXd genForces;
 
     /// quadcopter model parameters
-    const double rotorPos = 0.17104913036744201, momConst = 0.016;
+    const double rotorPos_ = 0.17104913036744201, momConst = 0.016;
     const double rps = 2 * M_PI, rpm = rps/60;
     const double g = 9.81, m = 1.727;
     const double hoverThrust = m * g / 4;
