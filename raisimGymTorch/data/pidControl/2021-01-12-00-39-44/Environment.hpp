@@ -43,7 +43,6 @@ public:
         actionMean_.setZero(actionDim_);
         actionStd_.setZero(actionDim_);
         obDouble_.setZero(obDim_);
-        loopCount_ = 5;
 
         /// nominal configuration of quadcopter: [0]-[2]: center of mass, [3]-[6]: quanternions, [7]-[10]: rotors
         gc_init_ << 0.0, 0.0, 0.135, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
@@ -92,7 +91,9 @@ public:
         /// action scaling
         thrusts_ = pid_.smallAnglesControl(gc_, gv_, bodyRot_, loopCount_, control_dt_, thrusts_,
                                 thrusts2TorquesAndForces_);
+        thrusts_ << 1.1*hoverThrust_, 1.1*hoverThrust_, 1.1*hoverThrust_, 1.1*hoverThrust_;
         applyThrusts();
+        loopCount_ = 5;
         if (loopCount_ > 4) loopCount_ = 0;
         for (int i = 0; i < int(control_dt_ / simulation_dt_ + 1e-10); i++) {
             if (server_) server_->lockVisualizationServerMutex();

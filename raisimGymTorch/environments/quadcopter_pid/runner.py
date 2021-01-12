@@ -71,13 +71,14 @@ for update in range(1000000):
     env.reset()
     action = []
     env.turn_on_visualization()
-    time.sleep(0.01)
+    time.sleep(0.001)
 
     # actual training
     for step in range(n_steps):
         obs = env.observe()
         action = ppo.observe(obs)
         reward, dones = env.step(action)
+        time.sleep(0.01)
 
 
     end = time.time()

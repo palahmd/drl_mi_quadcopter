@@ -18,12 +18,12 @@ pidController::pidController(double P, double I, double D) {
     controlThrusts.setZero();
 }
 
-void pidController::smallAnglesControl(Eigen::VectorXd& gc_, Eigen::VectorXd gv_, Eigen::Matrix3d& bodyRot_,
+Eigen::VectorXd pidController::smallAnglesControl(Eigen::VectorXd& gc_, Eigen::VectorXd gv_, Eigen::Matrix3d& bodyRot_,
                                        int& loopCount_, double control_dt_, Eigen::VectorXd& thrusts_,
                                        Eigen::Matrix4d& thrusts2TorquesAndForces_) {
     /*** PD Controller for small angles ***/
     // current state and error. eulerAngles is a conversion from quaternions to Euler Angles
-    eulerAngles = ToEulerAngles(gv_);
+    eulerAngles = ToEulerAngles(gc_);
     angVel_Body = bodyRot_ * gv_.segment(3,3);
     currState << gc_.head(3), eulerAngles, gv_.head(3), angVel_Body;
     desState = targetPoint;
@@ -49,11 +49,26 @@ void pidController::smallAnglesControl(Eigen::VectorXd& gc_, Eigen::VectorXd gv_
     u[2] = 0.0101 * 81 * errState[4] + 2 * 0.0101 * 9 * errState[10];
     u[3] = 0.00996 * 81 * errState[5] + 2 * 0.00996 * 9 * errState[11];
 
+    /** the input u for reaching the the desired state has to be transformed into each rotor thrust.
+     ** The control thrust from this time step will be partly applied in the next time step
+     ** due to the rotor velocity change delay in the motor model **/
+    controlThrusts = thrusts2TorquesAndForces_.inverse() * u;
+
+    /// scale controlThrusts and avoid thrusts_ out of range: 0.5 - 1.5 * hoverThrust_
+    double max_scale = controlThrusts.maxCoeff();
+    if (max_scale > (1.5 * 1.727 * 9.81/4)){
+        controlThrusts = 1.5 / max_scale * (1.727 * 9.81/4) * controlThrusts;
+    }
+    for (int i = 0; i<4; i++){
+        if (controlThrusts[i]< (0.5 * 1.727 * 9.81/4)){
+            controlThrusts[i] = 0.5 * 1.727 * 9.81/4;
+        }
+    }
 
     /** Motor Model for motor i:
-     **         time_constant_up = 0.0125 sec
-     **         time_const_down = 0.025 sec
-     **         thrust(t) = thrust(t-1) + (controlThrust(t-1) - thrust(t-1)) * control_dt_/time_constant **/
+ **         time_constant_up = 0.0125 sec
+ **         time_const_down = 0.025 sec
+ **         thrust(t) = thrust(t-1) + (controlThrust(t-1) - thrust(t-1)) * control_dt_/time_constant **/
     for (int i = 0; i<4; i++){
         if (thrusts_[i]<controlThrusts[i]) {  // time constant for increasing rotor speed
             thrusts_[i] = thrusts_[i] + (controlThrusts[i] - thrusts_[i]) * control_dt_ / 0.0125;
@@ -62,21 +77,7 @@ void pidController::smallAnglesControl(Eigen::VectorXd& gc_, Eigen::VectorXd gv_
         }
     }
 
-    /** the input u for reaching the the desired state has to be transformed into each rotor thrust.
-     ** The control thrust from this time step will be partly applied in the next time step
-     ** due to the rotor velocity change delay in the motor model **/
-    controlThrusts = thrusts2TorquesAndForces_.inverse() * u;
-
-    /// scale controlThrusts and avoid thrusts_ out of range: 0.5 - 1.5 * hoverThrust_
-    double max_scale = controlThrusts.maxCoeff();
-    if (max_scale > 1.5 * 1.727 * 9.81/4){
-        controlThrusts = 1.5 / max_scale * 1.727 * 9.81/4 * controlThrusts;
-    }
-    for (int i = 0; i<4; i++){
-        if (controlThrusts[i]< 0.5 * 1.727 * 9.81/4){
-            controlThrusts[i] = 0.5 * 1.727 * 9.81/4;
-        }
-    }
+    return thrusts_;
 }
 
 void pidController::setTargetPoint(double x, double y, double z){

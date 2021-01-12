@@ -12,7 +12,7 @@ public:
 
     ~pidController() = default;;
 
-    void smallAnglesControl(Eigen::VectorXd& gc_, Eigen::VectorXd gv_, Eigen::Matrix3d& bodyRot_,
+    Eigen::VectorXd smallAnglesControl(Eigen::VectorXd& gc_, Eigen::VectorXd gv_, Eigen::Matrix3d& bodyRot_,
                                            int& loopCount_, double control_dt_, Eigen::VectorXd& thrusts_,
                                            Eigen::Matrix4d& thrusts2TorquesAndForces_);
 
