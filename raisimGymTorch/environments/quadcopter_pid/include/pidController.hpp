@@ -10,13 +10,11 @@ class pidController {
 public:
     pidController(double P, double I, double D);
 
-<<<<<<< HEAD
-    pidController() {};
-    ~pidController() {};
+    ~pidController() = default;;
 
-=======
->>>>>>> master
-    void smallAnglesControl();
+    Eigen::VectorXd smallAnglesControl(Eigen::VectorXd& gc_, Eigen::VectorXd gv_, Eigen::Matrix3d& bodyRot_,
+                                           int& loopCount_, double control_dt_, Eigen::VectorXd& thrusts_,
+                                           Eigen::Matrix4d& thrusts2TorquesAndForces_);
 
     void setTargetPoint(double x, double y, double z);
 
