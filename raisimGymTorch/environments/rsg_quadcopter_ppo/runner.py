@@ -34,9 +34,7 @@ print(home_path)
 cfg = YAML().load(open(task_path + "/cfg.yaml", 'r'))
 
 # create environment from the configuration file
-print('upto here working');
 env = VecEnv(rsg_quadcopter_ppo.RaisimGymEnv(home_path + "/../rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'])
-print('upto here working 2');
 # shortcuts
 ob_dim = env.num_obs
 act_dim = env.num_acts
@@ -69,7 +67,7 @@ if mode == 'retrain':
     full_checkpoint_path = weight_path.rsplit('/', 1)[0] + '/' + 'full_' + weight_path.rsplit('/', 1)[1].split('_', 1)[1] + '.pt'
     mean_csv_path = weight_path.rsplit('/', 1)[0] + '/' + 'mean' + weight_path.rsplit('/', 1)[1].split('_', 1)[1] + '.csv'
     var_csv_path = weight_path.rsplit('/', 1)[0] + '/' + 'var' + weight_path.rsplit('/', 1)[1].split('_', 1)[1] + '.csv'
-    saver = ConfigurationSaver(log_dir=home_path + "/raisimGymTorch/data/roughTerrain",
+    saver = ConfigurationSaver(log_dir=home_path + "/data/ppo",
                                save_items=[task_path + "/cfg.yaml", task_path + "/Environment.hpp"],
                                pretrained_items=[weight_path.rsplit('/', 1)[0].rsplit('/', 1)[1], [weight_path+'.pt', weight_path+'.txt', full_checkpoint_path, mean_csv_path, var_csv_path]])
     ## load observation scaling from files of pre-trained model
@@ -82,7 +80,7 @@ if mode == 'retrain':
     critic.architecture.load_state_dict(checkpoint['critic_architecture_state_dict'])
 else:
     # save the configuration and other files
-    saver = ConfigurationSaver(log_dir=home_path + "/raisimGymTorch/data/roughTerrain",
+    saver = ConfigurationSaver(log_dir=home_path + "/data/ppo",
                                save_items=[task_path + "/cfg.yaml", task_path + "/Environment.hpp"])
 
 ppo = PPO.PPO(actor=actor,
@@ -163,7 +161,7 @@ for update in range(1000000):
     average_dones = done_sum / total_steps
     avg_rewards.append(average_ll_performance)
 
-    actor.distribution.enforce_minimum_std((torch.ones(12)*0.2).to(device))
+    actor.distribution.enforce_minimum_std((torch.ones(4)*0.2).to(device))
 
     print('----------------------------------------------------')
     print('{:>6}th iteration'.format(update))

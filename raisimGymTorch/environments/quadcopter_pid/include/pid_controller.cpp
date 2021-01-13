@@ -56,13 +56,12 @@ Eigen::VectorXd pidController::smallAnglesControl(Eigen::VectorXd& gc_, Eigen::V
 
     /// scale controlThrusts and avoid thrusts_ out of range: 0.5 - 1.5 * hoverThrust_
     double max_scale = controlThrusts.maxCoeff();
+    double min_scale = controlThrusts.minCoeff();
     if (max_scale > (1.5 * 1.727 * 9.81/4)){
         controlThrusts = 1.5 / max_scale * (1.727 * 9.81/4) * controlThrusts;
     }
-    for (int i = 0; i<4; i++){
-        if (controlThrusts[i]< (0.5 * 1.727 * 9.81/4)){
-            controlThrusts[i] = 0.5 * 1.727 * 9.81/4;
-        }
+    if (min_scale < (0.5 * 1.727 * 9.81/4)){
+        controlThrusts = 0.5 / max_scale * (1.727 * 9.81/4) * controlThrusts;
     }
 
     /** Motor Model for motor i:

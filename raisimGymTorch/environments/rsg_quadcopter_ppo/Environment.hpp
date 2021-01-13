@@ -48,6 +48,7 @@ public:
 
         /// initialize rotor thrusts_ and conversion matrix for generated forces and torques
         thrusts_.setZero(nRotors_);
+        controlThrusts_.setZero(nRotors_);
         thrusts2TorquesAndForces_ << 1, 1, 1, 1,
                 rotorPos_, -rotorPos_, -rotorPos_, rotorPos_,
                 -rotorPos_, -rotorPos_, rotorPos_, rotorPos_,
@@ -60,6 +61,12 @@ public:
 
         /// Reward coefficients
         rewards_.initializeFromConfigurationFile (cfg["reward"]);
+
+        /// indices of links that should not make contact with ground - all links and bodies
+        bodyIndices_.insert(robot_->getBodyIdx("rotor_0"));
+        bodyIndices_.insert(robot_->getBodyIdx("rotor_1"));
+        bodyIndices_.insert(robot_->getBodyIdx("rotor_2"));
+        bodyIndices_.insert(robot_->getBodyIdx("rotor_3"));
 
         /// visualize if it is the first environment
         if (visualizable_) {
@@ -83,10 +90,30 @@ public:
     }
 
     float step(const Eigen::Ref<EigenVec> &action) final {
-        /// action scaling TODO: Motor model
-        thrusts_ = action.cast<double>();
-        thrusts_ = thrusts_.cwiseProduct(actionStd_);
-        thrusts_ += actionMean_;
+        /// action scaling
+        controlThrusts_ = action.cast<double>();
+        controlThrusts_ = controlThrusts_.cwiseProduct(actionStd_);
+        controlThrusts_ += actionMean_;
+
+        double max_scale = controlThrusts_.maxCoeff();
+        double min_scale = controlThrusts_.minCoeff();
+
+        if (max_scale > (1.5 * hoverThrust_)){
+            controlThrusts_ = 1.5 / max_scale * hoverThrust_ * controlThrusts_;
+        }
+        else if (min_scale < 0.5 * hoverThrust_) {
+            controlThrusts_ = 0.5 / min_scale * hoverThrust_ * controlThrusts_;
+        }
+
+        /// motor model
+        for (int i = 0; i<4; i++){
+            if (thrusts_[i]<controlThrusts_[i]) {  // time constant for increasing rotor speed
+                thrusts_[i] = thrusts_[i] + (controlThrusts_[i] - thrusts_[i]) * simulation_dt_ / 0.0125;
+            } else if (thrusts_[i]>controlThrusts_[i]){   // time constant for decreasing rotor speed
+                thrusts_[i] = thrusts_[i] + (controlThrusts_[i] - thrusts_[i]) * simulation_dt_ / 0.025;
+            }
+        }
+
         applyThrusts();
 
         for (int i = 0; i < int(control_dt_ / simulation_dt_ + 1e-10); i++) {
@@ -164,6 +191,12 @@ public:
     bool isTerminalState(float& terminalReward) final {
         terminalReward = float(terminalRewardCoeff_);
 
+
+        for(auto& contact: robot_->getContacts()) {
+            if (bodyIndices_.find(contact.getlocalBodyIndex()) == bodyIndices_.end())
+                return true;
+        }
+
         terminalReward = 0.f;
         return false;
     }
@@ -175,7 +208,7 @@ private:
   Eigen::Vector3d bodyPos_, bodyLinVel_, bodyAngVel_;
   Eigen::Matrix3d bodyRot_;
 
-  Eigen::VectorXd thrusts_;
+  Eigen::VectorXd thrusts_, controlThrusts_;
   Eigen::Matrix4d thrusts2TorquesAndForces_;
   Eigen::Vector4d torquesAndForces_;
   Eigen::Vector3d torques_baseFrame_, forces_baseFrame_;
@@ -197,6 +230,7 @@ private:
   Eigen::Vector4d actionMean_, actionStd_;
   std::set<size_t> baseIndex_;
   raisim::Reward rewards_;
+  std::set<size_t> bodyIndices_;
 
 };
 }
