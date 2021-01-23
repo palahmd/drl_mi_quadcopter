@@ -1,7 +1,7 @@
 from ruamel.yaml import YAML, dump, RoundTripDumper
 from raisimGymTorch.env.bin import rsg_quadcopter_ppo
 from raisimGymTorch.env.RaisimGymVecEnv import RaisimGymVecEnv as VecEnv
-from raisimGymTorch.helper.raisim_gym_helper import ConfigurationSaver
+from raisimGymTorch.helper.raisim_gym_helper import ConfigurationSaver, load_param, tensorboard_launcher
 import os
 import math
 import time
@@ -93,7 +93,7 @@ ppo = PPO.PPO(actor=actor,
               num_mini_batches=4,
               device=device,
               log_dir=saver.data_dir,
-              mini_batch_sampling='in_order',
+              shuffle_batch=False,
               )
 
 if mode == 'retrain':

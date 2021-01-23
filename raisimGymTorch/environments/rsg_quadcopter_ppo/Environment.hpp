@@ -55,8 +55,8 @@ public:
                 momConst_, -momConst_, momConst_, -momConst_;
 
         /// action & observation scaling
-        actionMean_.setConstant(g_*hoverThrust_);
-        actionStd_.setConstant(1);
+        actionMean_.setConstant(hoverThrust_);
+        actionStd_.setConstant(0.5*hoverThrust_);
         goalPoint_ << 10.0, 10.0, 10.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
 
         /// Reward coefficients
@@ -75,7 +75,7 @@ public:
             server_->focusOn(robot_);
 
             /// visualize target point
-            auto visPoint = server_->addVisualSphere("visPoint", 0.25, 0, 0.8, 0);
+            auto visPoint = server_->addVisualSphere("visPoint", 0.25, 0.8, 0, 0);
             visPoint->setPosition(goalPoint_.head(3));
 
             raisim::MSLEEP(1000);
@@ -204,33 +204,40 @@ public:
 
 private:
 
-  raisim::Mat<3,3> worldRot_;
-  Eigen::Vector3d bodyPos_, bodyLinVel_, bodyAngVel_;
-  Eigen::Matrix3d bodyRot_;
+    /// simulation objects and parameters
+    raisim::ArticulatedSystem* robot_;
+    bool visualizable_ = true;
 
-  Eigen::VectorXd thrusts_, controlThrusts_;
-  Eigen::Matrix4d thrusts2TorquesAndForces_;
-  Eigen::Vector4d torquesAndForces_;
-  Eigen::Vector3d torques_baseFrame_, forces_baseFrame_;
-  raisim::Vec<3> torques_worldFrame_, forces_worldFrame_;
-  Eigen::VectorXd genForces_;
 
-  /// quadcopter model parameters
-  const double rotorPos_ = 0.17104913036744201, momConst_ = 0.016;
-  const double rps_ = 2 * M_PI, rpm_ = rps_/60;
-  const double g_ = 9.81, m_ = 1.727;
-  const double hoverThrust_ = m_ * g_ / 4;
+    /// dynamics variables
+    int gcDim_, gvDim_, nRotors_;
+    Eigen::VectorXd gc_init_, gv_init_, gc_, gv_;
+    Eigen::VectorXd obDouble_, goalPoint_;
+    Eigen::Vector4d actionMean_, actionStd_;
 
-  int gcDim_, gvDim_, nRotors_;
-  bool visualizable_ = true;
-  raisim::ArticulatedSystem* robot_;
-  Eigen::VectorXd gc_init_, gv_init_, gc_, gv_;
-  double terminalRewardCoeff_ = -10.;
-  Eigen::VectorXd obDouble_, goalPoint_;
-  Eigen::Vector4d actionMean_, actionStd_;
-  std::set<size_t> baseIndex_;
-  raisim::Reward rewards_;
-  std::set<size_t> bodyIndices_;
+    raisim::Mat<3,3> worldRot_;
+    Eigen::Vector3d bodyPos_, bodyLinVel_, bodyAngVel_;
+    Eigen::Matrix3d bodyRot_;
+
+    Eigen::VectorXd thrusts_, controlThrusts_;
+    Eigen::Matrix4d thrusts2TorquesAndForces_;
+    Eigen::Vector4d torquesAndForces_;
+    Eigen::Vector3d torques_baseFrame_, forces_baseFrame_;
+    raisim::Vec<3> torques_worldFrame_, forces_worldFrame_;
+    Eigen::VectorXd genForces_;
+
+
+    /// quadcopter model parameters
+    const double rotorPos_ = 0.17104913036744201, momConst_ = 0.016;
+    const double rps_ = 2 * M_PI, rpm_ = rps_/60;
+    const double g_ = 9.81, m_ = 1.727;
+    const double hoverThrust_ = m_ * g_ / 4;
+
+
+    /// reward parameters
+    raisim::Reward rewards_;
+    double terminalRewardCoeff_ = -1.;
+    std::set<size_t> bodyIndices_;
 
 };
 }
