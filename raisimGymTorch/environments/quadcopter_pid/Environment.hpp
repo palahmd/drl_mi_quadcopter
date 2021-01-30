@@ -43,7 +43,6 @@ public:
         actionMean_.setZero(actionDim_);
         actionStd_.setZero(actionDim_);
         obDouble_.setZero(obDim_);
-        loopCount_ = 5;
 
         /// nominal configuration of quadcopter: [0]-[2]: center of mass, [3]-[6]: quanternions, [7]-[10]: rotors
         gc_init_ << 0.0, 0.0, 0.135, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
@@ -90,16 +89,15 @@ public:
 
     float step(const Eigen::Ref<EigenVec> &action) final {
         /// action scaling
-        thrusts_ = pid_.smallAnglesControl(gc_, gv_, bodyRot_, loopCount_, control_dt_, thrusts_,
-                                thrusts2TorquesAndForces_);
+        thrusts_ = action.cast<double>();
+
         applyThrusts();
-        if (loopCount_ > 4) loopCount_ = 0;
         for (int i = 0; i < int(control_dt_ / simulation_dt_ + 1e-10); i++) {
             if (server_) server_->lockVisualizationServerMutex();
             world_->integrate();
             if (server_) server_->unlockVisualizationServerMutex();
         }
-        loopCount_++;
+
         updateObservation();
 
         rewards_.record("position", std::sqrt(bodyPos_.squaredNorm()));
@@ -129,7 +127,7 @@ public:
         // World Frame rotation Matrix and quaternion: obDouble_[9]-obDouble_[17], ob_q[9]-ob_q[12]
         for (size_t i = 0; i < 3; i++) {
             for (size_t j = 0; j<3; j++){
-                obDouble_[i + j + 3] = bodyRot_(i,j);
+                obDouble_[j + (i+1)*3] = bodyRot_(i,j);
             }
         }
 
