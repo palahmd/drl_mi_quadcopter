@@ -19,11 +19,7 @@ int main(int argc, char *argv[]) {
     world.setTimeStep(timeStep);
 
     /// create raisim objects
-<<<<<<< HEAD
     ground = world.addGround();
-=======
-    ground = world.addGround(0, "rubber");
->>>>>>> master
     robot = world.addArticulatedSystem(
             binaryPath.getDirectory() + "\\rsc\\ITM-quadcopter\\urdf\\ITM-quadcopter.urdf");
     robot->setName("Quaddy");
@@ -37,15 +33,11 @@ int main(int argc, char *argv[]) {
 
     /// initialize containers
     gc.setZero(gcDim); gc_init.setZero(gcDim); gv.setZero(gvDim); gv_init.setZero(gvDim);
-<<<<<<< HEAD
     genForces.setZero(gvDim); ob.setZero(obDim); ob_q.setZero(obDim - 5);
-=======
-    genForces.setZero(gcDim); ob.setZero(obDim); ob_q.setZero(obDim - 5);
->>>>>>> master
 
     /// initialize state and nominal configuration: [0]-[2]: center of mass, [3]-[6]: quaternions, [7]-[10]: rotors
     gc_init << 0, 0, 0.135, 1, 0, 0, 0, 0.0, 0.0, 0.0, 0.0;
-    gv_init << 0, 0, 0, 0, 0, 0, -4000 * rpm, 4000 * rpm, -4000 * rpm, 4000 * rpm; // rotor movement for visualization
+    gv_init << 0, 0, 0, 0, 0, 0, -400 * rpm, 400 * rpm, -400 * rpm, 400 * rpm; // rotor movement for visualization
     robot->setState(gc_init, gv_init);
 
     /// initialize rotor thrusts and conversion matrix for generated forces and torques
@@ -72,11 +64,7 @@ int main(int argc, char *argv[]) {
     auto begin = std::chrono::steady_clock::now();
     loopCount = 5;
 
-<<<<<<< HEAD
     for (i = 0; i < 10000; i++) {
-=======
-    for (i = 0; i < 20000; i++) {
->>>>>>> master
         updateState();
         pid.smallAnglesControl();
         applyThrusts();
@@ -90,11 +78,8 @@ int main(int argc, char *argv[]) {
         server.integrateWorldThreadSafe();
     }
 
-<<<<<<< HEAD
+
     /// Benchmarking the algorithms within the integration loop
-=======
-    /// Benchmark of the algorithms in the integration loop
->>>>>>> master
     auto end = std::chrono::steady_clock::now();
     raisim::print_timediff(i,begin,end);
 

@@ -10,12 +10,9 @@ class pidController {
 public:
     pidController(double P, double I, double D);
 
-<<<<<<< HEAD
     pidController() {};
     ~pidController() {};
 
-=======
->>>>>>> master
     void smallAnglesControl();
 
     void setTargetPoint(double x, double y, double z);
