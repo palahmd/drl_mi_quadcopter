@@ -31,7 +31,7 @@ public:
         gcDim_ = robot_->getGeneralizedCoordinateDim();
         gvDim_ = robot_->getDOF();
         nRotors_ = gvDim_ - 6;
-        obDim_ = 18;
+        obDim_ = 22;
         actionDim_ = nRotors_;
 
         /// initialize containers
@@ -46,7 +46,7 @@ public:
 
         /// nominal configuration of quadcopter: [0]-[2]: center of mass, [3]-[6]: quanternions, [7]-[10]: rotors
         gc_init_ << 0.0, 0.0, 0.135, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
-        gv_init_ << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -4000 * rpm_, 4000 * rpm_, -4000 * rpm_, 4000 * rpm_;
+        gv_init_ << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -400 * rpm_, 400 * rpm_, -400 * rpm_, 400 * rpm_;
 
         /// initialize rotor thrusts_ and conversion matrix for generated forces and torques
         thrusts_.setZero(nRotors_);
@@ -74,9 +74,8 @@ public:
             server_ = std::make_unique<raisim::RaisimServer>(world_.get());
             server_->launchServer();
             server_->focusOn(robot_);
-            auto visPoint = server_->addVisualSphere("visPoint", 0.25, 0, 0.8, 0);
+            auto visPoint = server_->addVisualSphere("visPoint", 0.25, 0.8, 0, 0);
             visPoint->setPosition(pid_.targetPoint.head(3));
-            raisim::MSLEEP(1000);
         }
     }
 
@@ -92,6 +91,8 @@ public:
         thrusts_ = action.cast<double>();
 
         applyThrusts();
+
+
         for (int i = 0; i < int(control_dt_ / simulation_dt_ + 1e-10); i++) {
             if (server_) server_->lockVisualizationServerMutex();
             world_->integrate();
@@ -117,9 +118,9 @@ public:
         bodyRot_ = worldRot_.e().transpose();
         bodyLinVel_ = bodyRot_ * gv_.segment(0,3);
         bodyAngVel_ = bodyRot_ * gv_.segment(3,3);
+        robot_->getBaseOrientation(quat_);
 
         /// observation vector (later for RL-Algorithm)
-        // World Frame position: obDouble_[0]-obDouble_[2], ob_q[0]-ob_q[2]
         for (size_t i = 0; i < 3; i++) {
             obDouble_[i] = bodyPos_[i];
         }
@@ -139,6 +140,10 @@ public:
         for (size_t i = 0; i < 3; i++) {
             obDouble_[i + 15] = bodyAngVel_[i];
         }
+
+        for (size_t i = 0; i < 4; i++) {
+            obDouble_[i + 18] = quat_.e()[i];
+        }
     }
 
 
@@ -156,7 +161,8 @@ public:
         torques_worldFrame_.e() = worldRot_.e() * torques_baseFrame_;
         forces_worldFrame_.e() = worldRot_.e() * forces_baseFrame_;
 
-        genForces_.head(6) << forces_worldFrame_.e(), torques_worldFrame_.e();
+        genForces_.head(3) = forces_worldFrame_.e();
+        genForces_.segment(3,3) = torques_worldFrame_.e();
         robot_->setGeneralizedForce(genForces_);
 
         /// this will visualize the applied forces and torques
@@ -173,6 +179,7 @@ public:
     pidController pid_ = pidController(2, 6, 10);
 
     raisim::Mat<3,3> worldRot_;
+    raisim::Vec<4> quat_;
     Eigen::Vector3d bodyPos_, bodyLinVel_, bodyAngVel_;
     Eigen::Matrix3d bodyRot_;
 

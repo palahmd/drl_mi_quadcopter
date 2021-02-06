@@ -17,16 +17,20 @@ class PID:
         self.u = np.zeros(shape=(act_dim, 1))
         self.controlThrusts = np.zeros(shape=(act_dim, 1))
         self.hoverThrust = self.m * 9.81 / 4
-        self.thrusts2TorquesAndForcesInv = np.linalg.inv(np.array([[1.0, 1.0, 1.0, 1.0], [0.1710491, -0.1710491, -0.1710491, 0.1710491],
-                                                  [-0.1710491, -0.1710491, 0.1710491, 0.1710491],
-                                                  [0.016, -0.016, 0.016, -0.016]]))
+        self.thrusts2TorquesAndForcesInv = np.linalg.inv(
+            np.array([[1.0, 1.0, 1.0, 1.0], [0.1710491, -0.1710491, -0.1710491, 0.1710491],
+                      [-0.1710491, -0.1710491, 0.1710491, 0.1710491],
+                      [0.016, -0.016, 0.016, -0.016]]))
 
     def smallAnglesControl(self, obs, target, loopCount):
 
-        eulerAngles = np.array(R.from_matrix(obs[3:12].reshape(3,3)).as_rotvec()).reshape(3,1)
+        # eulerAngles = np.array(R.from_matrix(obs[3:12].reshape(3, 3)).as_rotvec()).reshape(3, 1)
+        eulerAngles = self.quattoEuler(obs[18:22])
         currState = np.concatenate([obs[0:3], eulerAngles, obs[12:18]])
+        desState = np.zeros(shape=(12, 1))
         errState = target - currState
-        desState = np.zeros(shape=(currState.shape[0], 1))
+
+        print(eulerAngles)
 
         # outer PID controller for Position Control, runs with 20 Hz
         # input: error between target point and current state
@@ -39,7 +43,6 @@ class PID:
         else:
             self.u[0] = self.u[0]
 
-
         # inner PD controller for Attitude Control, runs with 100 Hz
         # input: desired acceleration and error between desired state and current state
         # output: u[1] - u[3] for attitude control
@@ -48,16 +51,36 @@ class PID:
         self.u[2] = 0.0101 * 81 * errState[4] + 2 * 0.0101 * 9 * errState[10]
         self.u[3] = 0.00996 * 81 * errState[5] + 2 * 0.00996 * 9 * errState[11]
 
+        print(errState)
+
         self.controlThrusts = self.thrusts2TorquesAndForcesInv.dot(self.u)
 
         # action scaling within the boundaries of 0.5 * hoverThrust < thrust < 1.5 * hoverThrust
         max_scale = np.max(self.controlThrusts)
-        min_scale = np.min(self.controlThrusts) + 1e-3
-        if min_scale < 0.5 * self.hoverThrust:
-            self.controlThrusts = 0.5 / min_scale * self.hoverThrust * self.controlThrusts
         if max_scale > 1.5 * self.hoverThrust:
             self.controlThrusts = 1.5 / max_scale * self.hoverThrust * self.controlThrusts
-
+        for i in range(len(self.controlThrusts)):
+            if self.controlThrusts[i] < 0.5 * self.hoverThrust:
+                self.controlThrusts[i] = 0.5 * self.hoverThrust
 
         return self.controlThrusts.reshape(1, self.act_dim).astype(dtype="float32")
 
+    def quattoEuler(self, q):
+
+        angles = np.zeros(shape=(3, 1))
+
+        sinr_cosp = 2 * (q[0] * q[1] + q[2] * q[3])
+        cosr_cosp = 1 - 2 * (q[1] * q[1] + q[2] * q[2])
+        angles[0] = np.arctan2(sinr_cosp, cosr_cosp)
+
+        sinp = 2 * (q[0] * q[2] - q[3] * q[1])
+        if np.abs(sinp) >= 1:
+            angles[1] = np.copysign(np.pi / 2, sinp)
+        else:
+            angles[1] = np.arcsin(sinp)
+
+        siny_cosp = 2 * (q[0] * q[3] + q[1] * q[2])
+        cosy_cosp = 1 - 2 * (q[2] * q[2] + q[3] * q[3])
+        angles[2] = np.arctan2(siny_cosp, cosy_cosp)
+
+        return angles
