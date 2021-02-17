@@ -1,4 +1,5 @@
 import torch.nn as nn
+import torch
 from .storage import RolloutStorage
 from .behavioralCloning import BCTrainer
 from imitation.algorithms import dagger
@@ -19,6 +20,7 @@ class DAggerRaisim:
                  num_learning_epochs,
                  save_dir,
                  beta,
+                 l2_reg_weight,
                  device='cpu'):
 
         self.env = env
@@ -30,6 +32,7 @@ class DAggerRaisim:
         self.num_learning_epochs = num_learning_epochs
         self.save_dir = save_dir
         self.beta = beta
+        self.l2_reg_weight = l2_reg_weight
         self.device = device
 
         self.beta_schedule = dagger.LinearBetaSchedule(beta)
@@ -71,10 +74,15 @@ class DAggerRaisim:
             for actor_obs_batch, actions_batch, expert_actions_batch in self.batch_sampler(self.num_mini_batches):
 
                 act_log_prob_batch, entropy_batch = self.actor.evaluate(actor_obs_batch, actions_batch)
+                l2_reg_norm_actor = [torch.sum(torch.square(w)) for w in self.actor.parameters()]
+                l2_reg_norm_critic = [torch.sum(torch.square(w)) for w in self.critic.parameters()]
+                l2_reg_norm = sum(l2_reg_norm_actor, l2_reg_norm_critic) / 2
 
                 action_loss = (actions_batch - expert_actions_batch).pow(2).mean()
                 entropy_loss = -entropy_batch.mean()
-                loss = action_loss + entropy_loss
+                l2_reg_loss = self.l2_reg_weight * l2_reg_norm
+
+                loss = action_loss + entropy_loss + l2_reg_loss
 
                 self.optimizer.zero_grad()
                 loss.backward()
