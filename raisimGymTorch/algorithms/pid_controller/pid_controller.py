@@ -5,7 +5,7 @@ from scipy.spatial.transform import Rotation as R
 ## PID Controller, only tuned for recent quadcopter model
 
 class PID:
-    def __init__(self, pGain, iGain, dGain, obs_dim, act_dim, timeStep, mass):
+    def __init__(self, pGain, iGain, dGain, obs_dim, act_dim, timeStep, mass, normalize_action=False):
         self.pGain = pGain
         self.iGain = iGain
         self.dGain = dGain
@@ -13,6 +13,7 @@ class PID:
         self.timeStep = timeStep
         self.obs_dim = obs_dim
         self.act_dim = act_dim
+        self.normalize_action = normalize_action
 
         self.u = np.zeros(shape=(act_dim, 1))
         self.controlThrusts = np.zeros(shape=(act_dim, 1))
@@ -22,10 +23,10 @@ class PID:
                       [-0.1710491, -0.1710491, 0.1710491, 0.1710491],
                       [0.016, -0.016, 0.016, -0.016]]))
 
-    def smallAnglesControl(self, obs, target, loopCount):
+    def control(self, obs, target, loopCount):
 
-        # eulerAngles = np.array(R.from_matrix(obs[3:12].reshape(3, 3)).as_rotvec()).reshape(3, 1)
-        eulerAngles = self.quattoEuler(obs[18:22])
+        eulerAngles = np.array(R.from_matrix(obs[3:12].reshape(3, 3)).as_rotvec()).reshape(3, 1)
+        #eulerAngles = self.quatToEuler(obs[18:22])
         currState = np.concatenate([obs[0:3], eulerAngles, obs[12:18]])
         desState = np.zeros(shape=(12, 1))
         errState = target - currState
@@ -63,9 +64,12 @@ class PID:
             if self.controlThrusts[i] < 0.5 * self.hoverThrust:
                 self.controlThrusts[i] = 0.5 * self.hoverThrust
 
+        if self.normalize_action:
+            self.controlThrusts = self.controlThrusts / (0.5*self.hoverThrust) - 2
+
         return self.controlThrusts.reshape(1, self.act_dim).astype(dtype="float32")
 
-    def quattoEuler(self, q):
+    def quatToEuler(self, q):
 
         angles = np.zeros(shape=(3, 1))
 
@@ -84,3 +88,4 @@ class PID:
         angles[2] = np.arctan2(siny_cosp, cosy_cosp)
 
         return angles
+

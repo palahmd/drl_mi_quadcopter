@@ -51,10 +51,16 @@ class DAggerRaisim:
         self.expert_actions = None
 
 
-    def observe(self, actor_obs):
+    def observe(self, actor_obs, expert_actions):
         self.actor_obs = actor_obs
-        self.actions, self.actions_log_prob = self.actor.sample(torch.from_numpy(actor_obs).to(self.device))
-        # self.actions = np.clip(self.actions.numpy(), self.env.action_space.low, self.env.action_space.high)
+
+        # TODO: Beta Scheduler
+        if np.random.uniform(0, 1) > self.beta:
+            self.actions, self.actions_log_prob = self.actor.sample(torch.from_numpy(actor_obs).to(self.device))
+        else:
+            self.actions = torch.from_numpy(expert_actions).to(self.device)
+            self.actions_log_prob = torch.ones(self.actions.shape)
+
         return self.actions.cpu().numpy()
 
     def step(self, value_obs, expert_actions, rews, dones):
@@ -67,6 +73,8 @@ class DAggerRaisim:
 
         if log_this_iteration:
             self.log({**locals(), **infos, 'it': update})
+
+        self.storage.clear()
 
     def _train_step_with_behavioral_cloning(self):
         mean_action_loss = 0

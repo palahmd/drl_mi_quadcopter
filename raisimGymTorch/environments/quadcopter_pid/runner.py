@@ -42,7 +42,7 @@ for update in range(1000000):
         frame_start = time.time()
         obs = env.observe(update_mean=True)
 
-        action = pid.smallAnglesControl(obs=obs.reshape((22, 1)), target=target_point, loopCount=loopCount)
+        action = pid.control(obs=obs.reshape((22, 1)), target=target_point, loopCount=loopCount)
 
         _, _ = env.step(action)
 
