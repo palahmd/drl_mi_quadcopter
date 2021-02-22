@@ -31,8 +31,6 @@ class PID:
         desState = np.zeros(shape=(12, 1))
         errState = target - currState
 
-        print(eulerAngles)
-
         # outer PID controller for Position Control, runs with 20 Hz
         # input: error between target point and current state
         # output: desired acceleration, desired pitch and roll angles and u[0] for altitude control
@@ -51,8 +49,6 @@ class PID:
         self.u[1] = 0.006687 * 81 * errState[3] + 2 * 0.006687 * 9 * errState[9]
         self.u[2] = 0.0101 * 81 * errState[4] + 2 * 0.0101 * 9 * errState[10]
         self.u[3] = 0.00996 * 81 * errState[5] + 2 * 0.00996 * 9 * errState[11]
-
-        print(errState)
 
         self.controlThrusts = self.thrusts2TorquesAndForcesInv.dot(self.u)
 

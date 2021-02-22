@@ -31,7 +31,7 @@ public:
         gcDim_ = robot_->getGeneralizedCoordinateDim();
         gvDim_ = robot_->getDOF();
         nRotors_ = gvDim_ - 6;
-        obDim_ = 18;
+        obDim_ = 22;
         actionDim_ = nRotors_;
 
         /// initialize containers

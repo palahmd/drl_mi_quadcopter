@@ -79,7 +79,7 @@ class RolloutStorage:
             returns_batch = self.returns.view(-1, 1)[indices]
             old_actions_log_prob_batch = self.actions_log_prob.view(-1, 1)[indices]
             advantages_batch = self.advantages.view(-1, 1)[indices]
-            yield actor_obs_batch, expert_obs_batch, critic_obs_batch, actions_batch, expert_actions_batch values_batch, advantages_batch, returns_batch, old_actions_log_prob_batch
+            yield actor_obs_batch, expert_obs_batch, critic_obs_batch, actions_batch, expert_actions_batch, values_batch, advantages_batch, returns_batch, old_actions_log_prob_batch
 
     def mini_batch_generator_inorder(self, num_mini_batches):
         batch_size = self.num_envs * self.num_transitions_per_env

@@ -31,7 +31,7 @@ public:
         gcDim_ = robot_->getGeneralizedCoordinateDim();
         gvDim_ = robot_->getDOF();
         nRotors_ = gvDim_ - 6;
-        obDim_ = 18;
+        obDim_ = 22;
         actionDim_ = nRotors_;
 
         /// initialize containers
@@ -141,9 +141,9 @@ public:
             obDouble_[i + 15] = bodyAngVel_[i];
         }
 
-        //for (size_t i = 0; i < 4; i++) {
-        //    obDouble_[i + 18] = quat_.e()[i];
-        //}
+        for (size_t i = 0; i < 4; i++) {
+            obDouble_[i + 18] = quat_.e()[i];
+        }
     }
 
 

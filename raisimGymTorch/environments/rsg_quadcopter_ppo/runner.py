@@ -28,8 +28,6 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 home_path = os.path.dirname(os.path.realpath(__file__)) + "/../.."
 task_path = os.path.dirname(os.path.realpath(__file__))
 
-print(home_path)
-
 # config
 cfg = YAML().load(open(task_path + "/cfg.yaml", 'r'))
 
@@ -136,7 +134,7 @@ for update in range(1000000):
         env.turn_off_visualization()
 
         env.reset()
-        # model.save(saver.data_dir+"/policies/policy", update)
+        # model.save(saver.data_dir+"/policies/po<licy", update)
         env.save_scaling(saver.data_dir, str(update))
 
     # actual training
@@ -147,6 +145,7 @@ for update in range(1000000):
         ppo.step(value_obs=obs, rews=reward, dones=dones)
         done_sum = done_sum + sum(dones)
         reward_ll_sum = reward_ll_sum + sum(reward)
+        print(action)
 
     # take st step to get value obs
     obs = env.observe()
