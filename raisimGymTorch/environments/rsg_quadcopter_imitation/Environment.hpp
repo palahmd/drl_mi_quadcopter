@@ -31,7 +31,7 @@ public:
         gcDim_ = robot_->getGeneralizedCoordinateDim();
         gvDim_ = robot_->getDOF();
         nRotors_ = gvDim_ - 6;
-        obDim_ = 18;
+        obDim_ = 22;
         actionDim_ = nRotors_;
 
         /// initialize containers
@@ -56,15 +56,11 @@ public:
                 momConst_, -momConst_, momConst_, -momConst_;
 
         /// action & observation scaling
-        actionMean_.setConstant(g_*hoverThrust_);
-        actionStd_.setConstant(1);
+        actionMean_.setConstant(hoverThrust_);
+        actionStd_.setConstant(0.5*hoverThrust_);
 
         /// set pd gains
         pid_.setTargetPoint(10, 10, 10);
-
-        /// action & observation scaling
-        actionMean_.setConstant(2.5);
-        actionStd_.setConstant(2.0);
 
         /// Reward coefficients
         rewards_.initializeFromConfigurationFile (cfg["reward"]);
@@ -89,6 +85,8 @@ public:
     float step(const Eigen::Ref<EigenVec> &action) final {
         /// action scaling
         thrusts_ = action.cast<double>();
+        thrusts_ = thrusts_.cwiseProduct(actionStd_);
+        thrusts_ = thrusts_ + actionMean_;
 
         applyThrusts();
 
@@ -141,9 +139,9 @@ public:
             obDouble_[i + 15] = bodyAngVel_[i];
         }
 
-        //for (size_t i = 0; i < 4; i++) {
-        //    obDouble_[i + 18] = quat_.e()[i];
-        //}
+        for (size_t i = 0; i < 4; i++) {
+            obDouble_[i + 18] = quat_.e()[i];
+        }
     }
 
 
