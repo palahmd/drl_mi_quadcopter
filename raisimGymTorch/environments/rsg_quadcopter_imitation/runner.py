@@ -63,14 +63,14 @@ for i in range (0, cfg['environment']['num_envs']):
 
 # Set up Actor Critic
 actor = module.Actor(module.MLP(cfg['architecture']['policy_net'],
-                                        nn.Tanh,
+                                        nn.LeakyReLU,
                                         ob_dim_learner,
                                         act_dim),
                          module.MultivariateGaussianDiagonalCovariance(act_dim, 1.0),
                          device=device)
 
 critic = module.Critic(module.MLP(cfg['architecture']['value_net'],
-                                          nn.Tanh,
+                                          nn.LeakyReLU,
                                           ob_dim_learner,
                                           1),
                            device)
@@ -81,7 +81,7 @@ saver = ConfigurationSaver(log_dir=home_path + "/training/imitation",
 #tensorboard_launcher(saver.data_dir+"/..")  # press refresh (F5) after the first ppo update
 
 
-learner = DAgger(actor=actor, critic=critic,
+learner = DAgger(actor=actor, critic=critic, act_dim=act_dim,
                  num_envs=cfg['environment']['num_envs'],
                  num_transitions_per_env=n_steps,
                  num_mini_batches=4,
@@ -89,11 +89,11 @@ learner = DAgger(actor=actor, critic=critic,
                  beta=0.1,
                  l2_reg_weight=0.0,
                  device=device)
+choose_expert = np.zeros(shape=(cfg['environment']['num_envs'], 1), dtype=bool)
 
 if mode == 'retrain':
     load_param(weight_path, env, actor, critic, learner.optimizer, saver.data_dir)
     learner.round_num = round_num
-
 
 for update in range(1000000):
     env.reset()
@@ -104,7 +104,8 @@ for update in range(1000000):
     env.turn_on_visualization()
     # evaluation and saving of the models
     if update == 0:
-        update = 1
+        update += 1
+    print(update)
 
     if update % cfg['environment']['eval_every_n'] == 0:
         print("Visualizing and evaluating the current policy")
@@ -115,7 +116,7 @@ for update in range(1000000):
             'optimizer_state_dict': learner.optimizer.state_dict(),
         }, saver.data_dir+"/full_"+str(update)+'.pt')
         # we create another graph just to demonstrate the save/load method
-        loaded_graph = module.MLP(cfg['architecture']['policy_net'], nn.Tanh, ob_dim_learner, act_dim)
+        loaded_graph = module.MLP(cfg['architecture']['policy_net'], nn.LeakyReLU, ob_dim_learner, act_dim)
         loaded_graph.load_state_dict(torch.load(saver.data_dir+"/full_"+str(update)+'.pt')['actor_architecture_state_dict'])
 
         #env.turn_on_visualization()
@@ -131,8 +132,7 @@ for update in range(1000000):
             learner_ob = target_point - expert_ob_clipped # learner_obs dimension = 18
 
             action_ll = loaded_graph.architecture(torch.from_numpy(learner_ob).cpu())
-            action_ll = learner.normalize_action(action_ll)
-            print(action_ll)
+            action_ll = learner.normalize_action_tensor(action_ll)
             rewards, dones = env.step(action_ll.cpu().detach().numpy())
             frame_end = time.time()
             wait_time = cfg['environment']['control_dt'] - (frame_end-frame_start)
@@ -158,8 +158,12 @@ for update in range(1000000):
             expert_obs_env_i = expert_obs[i, :].copy()
             expert_actions[i, :] = expert.control(obs=expert_obs_env_i.reshape((22, 1)),
                                                   target=target_point[0:12].reshape((12, 1)), loopCount=loopCount)
+            choose_expert[i][0] = learner.choose_expert_action()
 
-        learner_actions = learner.observe(actor_obs=learner_obs, expert_actions=expert_actions)
+        if step == n_steps/10:
+            print(expert_actions)
+
+        learner_actions = learner.observe(expert_chosen=choose_expert, actor_obs=learner_obs, expert_actions=expert_actions)
 
         rewards, dones = env.step(learner_actions)
         learner.step(obs=learner_obs, rews=rewards, dones=dones)
@@ -176,6 +180,8 @@ for update in range(1000000):
          #   time.sleep(wait_time)
 
         done_sum = done_sum + sum(dones)
+
+
 
     #expert_obs = env.observe(update_mean=True)
     #learner_obs = target_point.reshape((1, 18)) - expert_obs
