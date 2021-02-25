@@ -53,7 +53,7 @@ n_steps = math.floor(cfg['environment']['max_time'] / cfg['environment']['contro
 total_steps = n_steps * env.num_envs
 
 # Set up PID Controller and target point
-expert = PID(2, 10, 6, ob_dim_expert, act_dim, cfg['environment']['control_dt'], 1.727, normalize_action=True)
+expert = PID(2, 10, 5.3, ob_dim_expert, act_dim, cfg['environment']['control_dt'], 1.727, normalize_action=True)
 target_point = np.array([10.0, 10.0, 10.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
                          0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], dtype="float32")
 target_point_n_envs = np.zeros(shape=(cfg['environment']['num_envs'], ob_dim_learner), dtype="float32")
@@ -63,40 +63,19 @@ for i in range (0, cfg['environment']['num_envs']):
 
 # Set up Actor Critic
 actor = module.Actor(module.MLP(cfg['architecture']['policy_net'],
-                                        nn.LeakyReLU,
+                                        nn.Tanh,
                                         ob_dim_learner,
                                         act_dim),
                          module.MultivariateGaussianDiagonalCovariance(act_dim, 1.0),
                          device=device)
 
 critic = module.Critic(module.MLP(cfg['architecture']['value_net'],
-                                          nn.LeakyReLU,
+                                          nn.Tanh,
                                           ob_dim_learner,
                                           1),
                            device)
 
-# Set up DAgger learner
-# if mode == 'retrain':
-#     # save the configuration and related files to pre-trained model
-#     if weight_path == "":
-#         raise Exception("\nCan't find the pre-trained weight, please provide a pre-trained weight with --weight switch\n")
-#     print("\nRetraining from the policy:", weight_path+".pt\n")
-#
-#     full_checkpoint_path = weight_path.rsplit('/', 1)[0] + '/' + 'full_' + weight_path.rsplit('/', 1)[1].split('_', 1)[1] + '.pt'
-#     mean_csv_path = weight_path.rsplit('/', 1)[0] + '/' + 'mean' + weight_path.rsplit('/', 1)[1].split('_', 1)[1] + '.csv'
-#     var_csv_path = weight_path.rsplit('/', 1)[0] + '/' + 'var' + weight_path.rsplit('/', 1)[1].split('_', 1)[1] + '.csv'
-#     saver = ConfigurationSaver(log_dir=home_path + "/data/ppo",
-#                                save_items=[task_path + "/cfg.yaml", task_path + "/Environment.hpp"])
-#     ## load observation scaling from files of pre-trained model
-#     env.load_scaling(weight_path.rsplit('/', 1)[0], int(weight_path.rsplit('/', 1)[1].split('_', 1)[1]))
-#     print("Load observation scaling in", weight_path.rsplit('/', 1)[0]+":", "mean"+str(int(weight_path.rsplit('/', 1)[1].split('_', 1)[1])) + ".csv", "and", "var"+str(int(weight_path.rsplit('/', 1)[1].split('_', 1)[1])) + ".csv")
-#     ## load actor and critic parameters from full checkpoint
-#     checkpoint = torch.load(full_checkpoint_path)
-#     actor.architecture.load_state_dict(checkpoint['actor_architecture_state_dict'])
-#     actor.distribution.load_state_dict(checkpoint['actor_distribution_state_dict'])
-#     critic.architecture.load_state_dict(checkpoint['critic_architecture_state_dict'])
-#else:
-    # save the configuration and other files
+
 saver = ConfigurationSaver(log_dir=home_path + "/training/imitation",
                                save_items=[task_path + "/cfg.yaml", task_path + "/Environment.hpp"])
 #tensorboard_launcher(saver.data_dir+"/..")  # press refresh (F5) after the first ppo update
@@ -107,7 +86,7 @@ learner = DAgger(actor=actor, critic=critic,
                  num_transitions_per_env=n_steps,
                  num_mini_batches=4,
                  num_learning_epochs=4,
-                 beta=0.99,
+                 beta=0.1,
                  l2_reg_weight=0.0,
                  device=device)
 
@@ -124,7 +103,9 @@ for update in range(1000000):
     average_dones = 0
     env.turn_on_visualization()
     # evaluation and saving of the models
-    update = 1
+    if update == 0:
+        update = 1
+
     if update % cfg['environment']['eval_every_n'] == 0:
         print("Visualizing and evaluating the current policy")
         torch.save({
@@ -134,7 +115,7 @@ for update in range(1000000):
             'optimizer_state_dict': learner.optimizer.state_dict(),
         }, saver.data_dir+"/full_"+str(update)+'.pt')
         # we create another graph just to demonstrate the save/load method
-        loaded_graph = module.MLP(cfg['architecture']['policy_net'], nn.LeakyReLU, ob_dim_learner, act_dim)
+        loaded_graph = module.MLP(cfg['architecture']['policy_net'], nn.Tanh, ob_dim_learner, act_dim)
         loaded_graph.load_state_dict(torch.load(saver.data_dir+"/full_"+str(update)+'.pt')['actor_architecture_state_dict'])
 
         #env.turn_on_visualization()
@@ -150,6 +131,8 @@ for update in range(1000000):
             learner_ob = target_point - expert_ob_clipped # learner_obs dimension = 18
 
             action_ll = loaded_graph.architecture(torch.from_numpy(learner_ob).cpu())
+            action_ll = learner.normalize_action(action_ll)
+            print(action_ll)
             rewards, dones = env.step(action_ll.cpu().detach().numpy())
             frame_end = time.time()
             wait_time = cfg['environment']['control_dt'] - (frame_end-frame_start)
@@ -164,7 +147,7 @@ for update in range(1000000):
 
     # avtual training
     for step in range(n_steps):
-        frame_start = time.time()
+        #frame_start = time.time()
 
         expert_obs = env.observe(update_mean=False) # expert_obs dimension = 22. The last four are quaternions
         expert_obs_clipped = expert_obs.copy()
@@ -179,18 +162,18 @@ for update in range(1000000):
         learner_actions = learner.observe(actor_obs=learner_obs, expert_actions=expert_actions)
 
         rewards, dones = env.step(learner_actions)
-        learner.step(value_obs=learner_obs, expert_actions=expert_actions, rews=rewards, dones=dones)
+        learner.step(obs=learner_obs, rews=rewards, dones=dones)
 
         # for outter control loop
         if loopCount == 5:
             loopCount = 0
         loopCount += 1
 
-        frame_end = time.time()
+        #frame_end = time.time()
 
-        wait_time = cfg['environment']['control_dt'] - (frame_end - frame_start)
-        if wait_time > 0.:
-            time.sleep(wait_time)
+        #wait_time = cfg['environment']['control_dt'] - (frame_end - frame_start)
+        #if wait_time > 0.:
+         #   time.sleep(wait_time)
 
         done_sum = done_sum + sum(dones)
 
@@ -206,7 +189,7 @@ for update in range(1000000):
 
     print('----------------------------------------------------')
     print('{:>6}th iteration'.format(update))
-    print('{:<40} {:>6}'.format("beta: ", '{:0.6f}'.format(learner.beta)))
+    print('{:<40} {:>6}'.format("beta: ", '{:0.6f}'.format(learner.beta + 0.0005)))
     print('{:<40} {:>6}'.format("mean value loss: ", '{:0.6f}'.format(mean_value_loss)))
     print('{:<40} {:>6}'.format("time elapsed in this iteration: ", '{:6.4f}'.format(end - start)))
     print('{:<40} {:>6}'.format("fps: ", '{:6.0f}'.format(total_steps / (end - start))))

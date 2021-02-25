@@ -30,8 +30,8 @@ class RolloutStorage:
         self.step = 0
 
     def add_transitions(self, actor_obs, critic_obs, actions, expert_actions, rewards, dones, values, actions_log_prob):
-        if self.step >= self.num_transitions_per_env:
-            raise AssertionError("Rollout buffer overflow")
+        #if self.step >= self.num_transitions_per_env:
+         #   raise AssertionError("Rollout buffer overflow")
         self.critic_obs[self.step].copy_(torch.from_numpy(critic_obs).to(self.device))
         self.actor_obs[self.step].copy_(torch.from_numpy(actor_obs).to(self.device))
         self.expert_obs[self.step].copy_(torch.from_numpy(actor_obs).to(self.device))

@@ -31,12 +31,13 @@ target_point = np.array([10.0, 10.0, 10.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.
 n_steps = math.floor(cfg['environment']['max_time'] / cfg['environment']['control_dt'])
 total_steps = n_steps * env.num_envs
 
-pid = PID(2, 10, 6, ob_dim, act_dim, cfg['environment']['control_dt'], 1.727)
+pid = PID(2, 10, 5.3, ob_dim, act_dim, cfg['environment']['control_dt'], 1.727)
 
 for update in range(1000000):
     env.reset()
     env.turn_on_visualization()
     loopCount = 5
+    time.sleep(0.5)
 
     for step in range(n_steps):
         frame_start = time.time()
