@@ -4,6 +4,7 @@ from raisimGymTorch.env.RaisimGymVecEnv import RaisimGymVecEnv as VecEnv
 from raisimGymTorch.algo.pid_controller.pid_controller import PID
 from raisimGymTorch.algo.imitation.DAgger import DAgger
 from raisimGymTorch.helper.raisim_gym_helper import ConfigurationSaver, load_param, tensorboard_launcher
+from raisimGymTorch.helper.env_helper import normalize_action_one_dim_tensor, normalize_observation
 import raisimGymTorch.algo.imitation.module as module
 import os
 import math
@@ -88,6 +89,7 @@ learner = DAgger(actor=actor, critic=critic, act_dim=act_dim,
                  num_learning_epochs=4,
                  beta=0.1,
                  l2_reg_weight=0.0,
+                 learning_rate=0.01,
                  device=device)
 choose_expert = np.zeros(shape=(cfg['environment']['num_envs'], 1), dtype=bool)
 
@@ -101,11 +103,9 @@ for update in range(1000000):
     loopCount = 5
     done_sum = 0
     average_dones = 0
-    env.turn_on_visualization()
     # evaluation and saving of the models
     if update == 0:
         update += 1
-    print(update)
 
     if update % cfg['environment']['eval_every_n'] == 0:
         print("Visualizing and evaluating the current policy")
@@ -119,7 +119,7 @@ for update in range(1000000):
         loaded_graph = module.MLP(cfg['architecture']['policy_net'], nn.LeakyReLU, ob_dim_learner, act_dim)
         loaded_graph.load_state_dict(torch.load(saver.data_dir+"/full_"+str(update)+'.pt')['actor_architecture_state_dict'])
 
-        #env.turn_on_visualization()
+        env.turn_on_visualization()
 
         env.start_video_recording(datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S") + "policy_"+str(update)+'.mp4')
 
@@ -128,12 +128,15 @@ for update in range(1000000):
 
             expert_ob = env.observe(update_mean=False) # expert_obs dimension = 22. The last four are quaternions
             expert_ob_clipped = expert_ob.copy()
+            print(expert_ob)
+            expert_ob_clipped = normalize_observation(env, expert_ob_clipped)
             expert_ob_clipped.resize((1, 18), refcheck=False)
             learner_ob = target_point - expert_ob_clipped # learner_obs dimension = 18
 
             action_ll = loaded_graph.architecture(torch.from_numpy(learner_ob).cpu())
-            action_ll = learner.normalize_action_tensor(action_ll)
-            rewards, dones = env.step(action_ll.cpu().detach().numpy())
+            action_ll = normalize_action_one_dim_tensor(action_ll)
+
+            _, _ = env.step(action_ll.cpu().detach().numpy())
             frame_end = time.time()
             wait_time = cfg['environment']['control_dt'] - (frame_end-frame_start)
             if wait_time > 0.:
@@ -147,10 +150,11 @@ for update in range(1000000):
 
     # avtual training
     for step in range(n_steps):
-        #frame_start = time.time()
 
         expert_obs = env.observe(update_mean=False) # expert_obs dimension = 22. The last four are quaternions
         expert_obs_clipped = expert_obs.copy()
+        print(expert_obs)
+        expert_obs_clipped = normalize_observation(env, expert_obs_clipped)
         expert_obs_clipped.resize((cfg['environment']['num_envs'], 18), refcheck=False)
         learner_obs = target_point_n_envs - expert_obs_clipped # learner_obs dimension = 18
 
@@ -160,13 +164,10 @@ for update in range(1000000):
                                                   target=target_point[0:12].reshape((12, 1)), loopCount=loopCount)
             choose_expert[i][0] = learner.choose_expert_action()
 
-        if step == n_steps/10:
-            print(expert_actions)
-
         learner_actions = learner.observe(expert_chosen=choose_expert, actor_obs=learner_obs, expert_actions=expert_actions)
 
-        rewards, dones = env.step(learner_actions)
-        learner.step(obs=learner_obs, rews=rewards, dones=dones)
+        _, _ = env.step(learner_actions)
+        learner.step(obs=learner_obs, rews=_, dones=_)
 
         # for outter control loop
         if loopCount == 5:
@@ -179,15 +180,15 @@ for update in range(1000000):
         #if wait_time > 0.:
          #   time.sleep(wait_time)
 
-        done_sum = done_sum + sum(dones)
+        #done_sum = done_sum + sum(dones)
 
 
 
     #expert_obs = env.observe(update_mean=True)
     #learner_obs = target_point.reshape((1, 18)) - expert_obs
 
-    mean_value_loss = learner.update()
-    average_dones = done_sum / total_steps
+    mean_action_log_prob_loss = learner.update()
+    #average_dones = done_sum / total_steps
 
     actor.distribution.enforce_minimum_std((torch.ones(4)).to(device))
 
@@ -196,11 +197,11 @@ for update in range(1000000):
     print('----------------------------------------------------')
     print('{:>6}th iteration'.format(update))
     print('{:<40} {:>6}'.format("beta: ", '{:0.6f}'.format(learner.beta + 0.0005)))
-    print('{:<40} {:>6}'.format("mean value loss: ", '{:0.6f}'.format(mean_value_loss)))
+    print('{:<40} {:>6}'.format("mean action log prob loss: ", '{:0.6f}'.format(mean_action_log_prob_loss)))
     print('{:<40} {:>6}'.format("time elapsed in this iteration: ", '{:6.4f}'.format(end - start)))
     print('{:<40} {:>6}'.format("fps: ", '{:6.0f}'.format(total_steps / (end - start))))
     print('{:<40} {:>6}'.format("real time factor: ", '{:6.0f}'.format(total_steps / (end - start)
                                                                        * cfg['environment']['control_dt'])))
-    print('std: ')
-    print(np.exp(actor.distribution.std.cpu().detach().numpy()))
+    print('action std: ')
+    print(actor.distribution.std.cpu().detach().numpy())
     print('----------------------------------------------------\n')

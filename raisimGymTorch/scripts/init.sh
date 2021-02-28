@@ -1,18 +1,55 @@
-yecho 'Path where raisimlib is installed, beginning from "/home". Example: /home/USER/raisimlib:'
+### Set up Path to raisimGymTorch in ~/.bashrc for linking and compiling
 
-read raisim_path
 
-RSG_PATH=$raisim_path'/raisimGymTorch'
+if grep -Fxq "export RSG_PATH=$RSG_PATH" ~/.bashrc
+then 
+	echo "raisimGymTorch Path is already existing in .bashrc"
+	RSG_PATH=$RSG_PATH
+else
+	echo 'Enter path where raisimlib is installed, starting from "/home/..."; Example: /home/USER/raisimlib:'
+	read raisim_path
+	RSG_PATH=$raisim_path'/raisimGymTorch'
+	
+	echo "Adding raisimGymTorch Path to .bashrc"
+	echo '## raisimGymTorch Path' >> ~/.bashrc
+	echo "export RSG_PATH=$RSG_PATH" >> ~/.bashrc
+	source ~/.bashrc
+fi
 
-echo '# raisimGymTorch Path' >> ~/.bashrc
-echo export RSG_PATH=$raisim_path'/raisimGymTorch' >> ~/.bashrc
 
-source ~/.bashrc
-
+### Link all the algorithm, environments and helper files to raisimGymTorch
 cd ..
 this_path=`pwd`
+echo "Linking algorithm, environments and helper files to raisimGymTorch"
 
-mkdir $RSG_PATH/raisimGymTorch/env/envs/rsg_quadcopter
-ln -s $this_path/rsg_quadcopter/* $RSG_PATH/raisimGymTorch/env/envs/rsg_quadcopter/
+# algorithms
+for dir in ./algorithms/*/
+do
+	dir=${dir%/}
+	dir=${dir##*/}
+	
+	mkdir -p $RSG_PATH/raisimGymTorch/algo/$dir
+	ln -s $this_path/algorithms/$dir/* $RSG_PATH/raisimGymTorch/algo/$dir
+done
 
-echo RSG_PATH=$raisim_path'/raisimGymTorch' added to ~/.bashrc and rsg_quacopter files linked to raisimGymTorch. Run compile.sh once or after any changes in rsg_quadcopter files before running a run_*.sh script.
+# environments
+for dir in ./environments/*/
+do
+	dir=${dir%/}
+	dir=${dir##*/}
+	
+	mkdir -p $RSG_PATH/raisimGymTorch/env/envs/$dir
+	ln -s $this_path/environments/$dir/* $RSG_PATH/raisimGymTorch/env/envs/$dir
+done
+
+# helper
+for dir in ./helper/*/
+do
+	dir=${dir%/}
+	dir=${dir##*/}
+	
+	mkdir -p $RSG_PATH/raisimGymTorch/helper/$dir
+	ln -s $this_path/helper/$dir/* $RSG_PATH/raisimGymTorch/helper/$dir
+done
+
+echo "Done - ready to compile and run"

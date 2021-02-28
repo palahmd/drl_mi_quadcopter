@@ -5,7 +5,7 @@ environment:
   render: True
   # just testing commenting
   num_envs: 10
-  eval_every_n: 20
+  eval_every_n: 10
   num_threads: 30
   simulation_dt: 0.0025
   control_dt: 0.01
