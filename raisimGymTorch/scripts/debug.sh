@@ -7,3 +7,4 @@ then
 	cd $this_path
 else
 	echo "please initialize first by running init.sh"
+fi

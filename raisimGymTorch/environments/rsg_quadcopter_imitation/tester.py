@@ -3,6 +3,7 @@ from raisimGymTorch.env.bin import rsg_quadcopter_imitation
 from raisimGymTorch.env.RaisimGymVecEnv import RaisimGymVecEnv as VecEnv
 import raisimGymTorch.algo.imitation.module as module
 from raisimGymTorch.algo.imitation.DAgger import DAgger
+from raisimGymTorch.helper.env_helper.env_helper import normalize_action, normalize_action_one_dim_tensor, normalize_observation
 import os
 import math
 import time

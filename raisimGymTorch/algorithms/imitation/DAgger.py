@@ -2,6 +2,9 @@ import torch
 import torch.optim as optim
 import numpy as np
 from .storage import RolloutStorage
+import os
+from datetime import datetime
+from torch.utils.tensorboard import SummaryWriter
 
 
 class DAgger:
@@ -14,9 +17,11 @@ class DAgger:
                  num_mini_batches,
                  num_learning_epochs,
                  beta,
+                 log_dir,
                  l2_reg_weight=0.001,
                  entropy_weight=0.0,
                  learning_rate=0.001,
+                 beta_scheruler=0.005,
                  device='cpu'):
 
         # Environment parameters
@@ -30,19 +35,20 @@ class DAgger:
         # DAgger components and parameters
         self.storage = RolloutStorage(num_envs, num_transitions_per_env, actor.obs_shape, critic.obs_shape,
                                       actor.action_shape, device)
-        self.batch_sampler = self.storage.mini_batch_generator_inorder
+        self.batch_sampler = self.storage.mini_batch_generator_shuffle
         self.actor = actor
         self.critic = critic
         self.beta_goal = beta
         self.beta = 1
+        self.beta_scheduler = beta_scheruler
         self.l2_reg_weight = l2_reg_weight
         self.entropy_weight = entropy_weight
         self.device = device
         self.optimizer = optim.Adam([*self.actor.parameters(), *self.critic.parameters()], lr=learning_rate)
 
         # Log
-        # self.log_dir = os.path.join(log_dir, datetime.now().strftime('%b%d_%H-%M-%S'))
-        # self.writer = SummaryWriter(log_dir=self.log_dir, flush_secs=10)
+        self.log_dir = os.path.join(log_dir, datetime.now().strftime('%b%d_%H-%M-%S'))
+        self.writer = SummaryWriter(log_dir=self.log_dir, flush_secs=10)
         self.tot_timesteps = 0
         self.tot_time = 0
 
@@ -72,22 +78,30 @@ class DAgger:
         self.storage.add_transitions(self.actor_obs, obs, self.learner_actions, self.expert_actions, rews, dones, values,
                                      self.learner_actions_log_prob)
 
-    def update(self, log_this_iteration=False):
-        mean_value_loss, infos = self._train_step_with_behavioral_cloning()
+    def update(self, log_this_iteration, update):
+        mean_action_loss, mean_action_log_prob_loss, infos = self._train_step_with_behavioral_cloning()
 
         # reduce beta while policy is learning
         if self.beta > self.beta_goal:
-            self.beta -= 0.0005
-
+            self.beta -= self.beta_scheduler
 
         if log_this_iteration:
             self.log({**locals(), **infos, 'it': update})
 
         self.storage.clear()
-        return mean_value_loss
+        return mean_action_loss, mean_action_log_prob_loss
+
+    def log(self, variables, width=80, pad=28):
+        self.tot_timesteps += self.num_transitions_per_env * self.num_envs
+        mean_std = self.actor.distribution.std.mean()
+
+        self.writer.add_scalar('Loss/action_loss', variables['mean_action_loss'], variables['it'])
+        self.writer.add_scalar('Loss/action_log_prob_loss', variables['mean_action_log_prob_loss'], variables['it'])
+        self.writer.add_scalar('Policy/mean_noise_std', mean_std.item(), variables['it'])
 
     def _train_step_with_behavioral_cloning(self):
         mean_action_loss = 0
+        mean_action_log_prob_loss = 0
         for epoch in range(self.num_learning_epochs):
             for actor_obs_batch, expert_obs_batch, critic_obs_batch, actions_batch, expert_actions_batch, values_batch, \
                 advantages_batch, returns_batch, old_actions_log_prob_batch \
@@ -97,24 +111,26 @@ class DAgger:
                 l2_reg = [torch.sum(torch.square(w)) for w in self.actor.parameters() and self.critic.parameters()]
                 l2_reg_norm = sum(l2_reg) / 2
 
-                #action_loss = 0.5*((actions_batch - expert_actions_batch)).pow(2).mean()
+                action_loss = 0.5*((torch.exp(old_actions_log_prob_batch) - expert_actions_batch)).pow(2).mean()
 
-                action_loss = -act_log_prob_batch.mean()
+                action_log_prob_loss = -act_log_prob_batch.mean()
                 entropy_loss = self.entropy_weight * -entropy_batch.mean()
-                l2_reg_loss = self.l2_reg_weight   * l2_reg_norm
+                l2_reg_loss = self.l2_reg_weight * l2_reg_norm
 
-                loss = action_loss + entropy_loss + l2_reg_loss
+                loss = action_log_prob_loss + entropy_loss + l2_reg_loss
 
                 self.optimizer.zero_grad()
                 loss.backward()
                 self.optimizer.step()
 
                 mean_action_loss += action_loss.item()
+                mean_action_log_prob_loss += action_log_prob_loss.item()
 
         num_updates = self.num_learning_epochs * self.num_mini_batches
         mean_action_loss /= num_updates
+        mean_action_log_prob_loss /=num_updates
 
-        return mean_action_loss, locals()
+        return mean_action_loss, mean_action_log_prob_loss, locals()
 
     def normalize_action(self, actions):
         min = torch.min(actions[:])
