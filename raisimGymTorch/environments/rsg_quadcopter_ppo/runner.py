@@ -2,6 +2,7 @@ from ruamel.yaml import YAML, dump, RoundTripDumper
 from raisimGymTorch.env.bin import rsg_quadcopter_ppo
 from raisimGymTorch.env.RaisimGymVecEnv import RaisimGymVecEnv as VecEnv
 from raisimGymTorch.helper.raisim_gym_helper import ConfigurationSaver, load_param, tensorboard_launcher
+from raisimGymTorch.helper.env_helper.env_helper import normalize_action, normalize_action_one_dim_tensor, normalize_observation
 import os
 import math
 import time
@@ -141,6 +142,7 @@ for update in range(1000000):
     for step in range(n_steps):
         obs = env.observe()
         action = ppo.observe(obs)
+        action = normalize_action(action)
         reward, dones = env.step(action)
         ppo.step(value_obs=obs, rews=reward, dones=dones)
         done_sum = done_sum + sum(dones)

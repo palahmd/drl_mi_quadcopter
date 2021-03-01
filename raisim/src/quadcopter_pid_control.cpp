@@ -18,6 +18,7 @@ int main(int argc, char *argv[]) {
     raisim::RaisimServer server(&world);
     world.setTimeStep(timeStep);
 
+
     /// create raisim objects
     ground = world.addGround();
     robot = world.addArticulatedSystem(

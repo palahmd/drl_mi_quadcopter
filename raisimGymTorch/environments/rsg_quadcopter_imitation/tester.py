@@ -2,12 +2,15 @@ from ruamel.yaml import YAML, dump, RoundTripDumper
 from raisimGymTorch.env.bin import rsg_quadcopter_imitation
 from raisimGymTorch.env.RaisimGymVecEnv import RaisimGymVecEnv as VecEnv
 import raisimGymTorch.algo.imitation.module as module
+from raisimGymTorch.algo.imitation.DAgger import DAgger
+from raisimGymTorch.helper.env_helper.env_helper import normalize_action, normalize_action_one_dim_tensor, normalize_observation
 import os
 import math
 import time
 import torch
 import argparse
 import numpy as np
+import torch.nn as nn
 
 
 # configuration
@@ -52,11 +55,38 @@ else:
     total_steps = n_steps * 1
     start_step_id = 0
 
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+    actor = module.Actor(module.MLP(cfg['architecture']['policy_net'],
+                                    nn.LeakyReLU,
+                                    ob_dim_learner,
+                                    act_dim),
+                         module.MultivariateGaussianDiagonalCovariance(act_dim, 1.0),
+                         device=device)
+
+    critic = module.Critic(module.MLP(cfg['architecture']['value_net'],
+                                      nn.LeakyReLU,
+                                      ob_dim_learner,
+                                      1),
+                           device)
+
+    act_dim = 4
+
+    learner = DAgger(actor=actor, critic=critic, act_dim=act_dim,
+                     num_envs=cfg['environment']['num_envs'],
+                     num_transitions_per_env=n_steps,
+                     num_mini_batches=4,
+                     num_learning_epochs=4,
+                     beta=0.1,
+                     l2_reg_weight=0.0,
+                     learning_rate=0.01,
+                     device=device)
+
     print("Visualizing and evaluating the policy: ", weight_path)
     loaded_graph = module.MLP(cfg['architecture']['policy_net'], torch.nn.LeakyReLU, ob_dim_learner, act_dim)
     loaded_graph.load_state_dict(torch.load(weight_path)['actor_architecture_state_dict'])
 
-    env.load_scaling(weight_dir, int(1000))
+    env.load_scaling(weight_dir, int(320))
     env.turn_on_visualization()
 
     # max_steps = 1000000
@@ -69,6 +99,7 @@ else:
         expert_ob_clipped.resize((1, 18), refcheck=False)
         learner_ob = target_point - expert_ob_clipped
         action_ll = loaded_graph.architecture(torch.from_numpy(learner_ob).cpu())
+        learner.normalize_action_tensor(action_ll)
         reward_ll, dones = env.step(action_ll.cpu().detach().numpy())
         reward_ll_sum = reward_ll_sum + reward_ll[0]
         if dones or step == max_steps - 1:

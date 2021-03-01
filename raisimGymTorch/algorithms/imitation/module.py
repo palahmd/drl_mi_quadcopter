@@ -79,6 +79,10 @@ class MLP(nn.Module):
             modules.append(self.activation_fn())
             scale.append(np.sqrt(2))
 
+        # output layer: sigmoid
+        # ground truth
+        # normalize obs
+
         modules.append(nn.Linear(shape[-1], output_size))
         self.architecture = nn.Sequential(*modules)
         scale.append(np.sqrt(2))
