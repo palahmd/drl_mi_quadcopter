@@ -80,6 +80,9 @@ public:
     void reset() final {
         robot_->setState(gc_init_, gv_init_);
         updateObservation();
+        if (visualizable_) {
+            server_->focusOn(robot_);
+        }
     }
 
     float step(const Eigen::Ref<EigenVec> &action) final {

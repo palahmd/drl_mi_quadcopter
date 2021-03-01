@@ -52,4 +52,7 @@ do
 	ln -s $this_path/helper/$dir/* $RSG_PATH/raisimGymTorch/helper/$dir
 done
 
+# Link raisimUnity for linux to current folder
+ln -s $RSG_PATH/../raisimUnity/linux $this_path/../raisimUnity
+
 echo "Done - ready to compile and run"

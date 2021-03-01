@@ -4,7 +4,7 @@ from raisimGymTorch.env.RaisimGymVecEnv import RaisimGymVecEnv as VecEnv
 from raisimGymTorch.algo.pid_controller.pid_controller import PID
 from raisimGymTorch.algo.imitation.DAgger import DAgger
 from raisimGymTorch.helper.raisim_gym_helper import ConfigurationSaver, load_param, tensorboard_launcher
-from raisimGymTorch.helper.env_helper.env_helper import normalize_action, normalize_action_one_dim_tensor, normalize_observation
+from raisimGymTorch.helper.env_helper.env_helper import normalize_action, normalize_observation
 import raisimGymTorch.algo.imitation.module as module
 import os
 import math
@@ -14,6 +14,7 @@ import torch
 import argparse
 import torch.nn as nn
 import datetime
+import subprocess, signal
 
 """
 Initialization
@@ -25,23 +26,22 @@ Here:   - Observation space normalized
 parser = argparse.ArgumentParser()
 parser.add_argument('-m', '--mode', help='set mode either train or retrain', type=str, default='train')
 parser.add_argument('-w', '--weight', help='pre-trained weight path', type=str, default='')
-parser.add_argument('-rn', '--roundnum', help='round number', type=int, default=0)
 args = parser.parse_args()
 mode = args.mode
 weight_path = args.weight
-round_num = args.roundnum
 
 # check if gpu is available
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 # directories
-home_path = os.path.dirname(os.path.realpath(__file__)) + "/../.."
 task_path = os.path.dirname(os.path.realpath(__file__))
+home_path = task_path + "/../.."
+raisim_unity_Path = home_path + "/raisimUnity/raisimUnity.x86_64"
 
 # logging
 saver = ConfigurationSaver(log_dir=home_path + "/training/imitation",
                            save_items=[task_path + "/cfg.yaml", task_path + "/Environment.hpp"])
-tensorboard_launcher(saver.data_dir+"/..")  # press refresh (F5) after the first ppo update
+#tensorboard_launcher(saver.data_dir+"/..")  # press refresh (F5) after the first ppo update
 
 # config
 cfg = YAML().load(open(task_path + "/cfg.yaml", 'r'))
@@ -55,9 +55,11 @@ ob_dim_expert = env.num_obs # expert has 4 additional values for quaternions
 ob_dim_learner = ob_dim_expert - 4
 act_dim = env.num_acts
 
-# Training steps
+# Training param
 n_steps = math.floor(cfg['environment']['max_time'] / cfg['environment']['control_dt'])
 total_steps = n_steps * env.num_envs
+normalize_learner_obs = True
+log_prob_loss = True
 
 # Expert: PID Controller and target point
 expert = PID(2, 10, 5.3, ob_dim_expert, act_dim, cfg['environment']['control_dt'], 1.727, normalize_action=True)
@@ -87,7 +89,7 @@ critic = module.Critic(module.MLP(cfg['architecture']['value_net'],
 learner = DAgger(actor=actor, critic=critic, act_dim=act_dim,
                  num_envs=cfg['environment']['num_envs'],
                  num_transitions_per_env=n_steps,
-                 num_mini_batches=12,
+                 num_mini_batches=6,
                  num_learning_epochs=8,
                  log_dir=saver.data_dir,
                  beta=0.1,
@@ -95,11 +97,10 @@ learner = DAgger(actor=actor, critic=critic, act_dim=act_dim,
                  learning_rate=0.001,
                  beta_scheduler=0.0005,
                  device=device)
-choose_expert = np.zeros(shape=(cfg['environment']['num_envs'], 1), dtype=bool)
 
 if mode == 'retrain':
     load_param(weight_path, env, actor, critic, learner.optimizer, saver.data_dir)
-    learner.round_num = round_num
+    learner.round_num = weight_path.rsplit('/', 1)[1].split('_', 1)[1].rsplit('.', 1)[0]
 
 
 """ 
@@ -116,7 +117,8 @@ for update in range(1000000):
     done_sum = 0
     average_dones = 0
 
-    # evaluation and saving of the models
+
+    """ Evaluation and saving of the models """
     if update % cfg['environment']['eval_every_n'] == 0:
         print("Visualizing and evaluating the current policy")
         torch.save({
@@ -125,24 +127,32 @@ for update in range(1000000):
             'critic_architecture_state_dict': critic.architecture.state_dict(),
             'optimizer_state_dict': learner.optimizer.state_dict(),
         }, saver.data_dir+"/full_"+str(update)+'.pt')
+
         # we create another graph just to demonstrate the save/load method
         loaded_graph = module.MLP(cfg['architecture']['policy_net'], nn.LeakyReLU, ob_dim_learner, act_dim)
         loaded_graph.load_state_dict(torch.load(saver.data_dir+"/full_"+str(update)+'.pt')['actor_architecture_state_dict'])
 
+        # open raisimUnity and wait until it has started and focused on robot
+        proc = subprocess.Popen(raisim_unity_Path)
+        time.sleep(5)
         env.turn_on_visualization()
+        env.reset()
+        time.sleep(2)
         env.start_video_recording(datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S") + "policy_"+str(update)+'.mp4')
+        time.sleep(2)
 
-        for step in range(n_steps*2):
+        for step in range(int(n_steps*1.5)):
             frame_start = time.time()
 
-            expert_ob = env.observe(update_mean=False) # expert_obs dimension = 22. The last four are quaternions
+            # separate and expert obs with dim 22 and (normalized) learner obs with dim 18
+            expert_ob = env.observe(update_mean=False)
             expert_ob_clipped = expert_ob.copy()
-            expert_ob_clipped = normalize_observation(env, expert_ob_clipped)
+            expert_ob_clipped = normalize_observation(env, expert_ob_clipped, normalize_ob=normalize_learner_obs)
             expert_ob_clipped.resize((cfg['environment']['num_envs'], 18), refcheck=False)
-            learner_ob = target_point - expert_ob_clipped # learner_obs dimension = 18
+            learner_ob = target_point - expert_ob_clipped
 
             action_ll = loaded_graph.architecture(torch.from_numpy(learner_ob).cpu())
-            action_ll = learner.normalize_action_tensor(action_ll)
+            action_ll = normalize_action(action_ll)
 
             _, _ = env.step(action_ll.cpu().detach().numpy())
 
@@ -154,25 +164,29 @@ for update in range(1000000):
         env.stop_video_recording()
         env.turn_off_visualization()
 
+        # close raisimUnity to use less ressources
+        os.kill(proc.pid+1, signal.SIGKILL)
+
         env.reset()
         env.save_scaling(saver.data_dir, str(update))
 
-    # avtual training
+
+    """ Atual training """
     for step in range(n_steps):
 
-        expert_obs = env.observe(update_mean=False) # expert_obs dimension = 22. The last four are quaternions
+        # separate and expert obs with dim 22 and (normalized) learner obs with dim 18
+        expert_obs = env.observe(update_mean=False)
         expert_obs_clipped = expert_obs.copy()
-        expert_obs_clipped = normalize_observation(env, expert_obs_clipped)
+        expert_obs_clipped = normalize_observation(env, expert_obs_clipped, normalize_ob=normalize_learner_obs)
         expert_obs_clipped.resize((cfg['environment']['num_envs'], 18), refcheck=False)
-        learner_obs = target_point_n_envs - expert_obs_clipped # learner_obs dimension = 18
+        learner_obs = target_point_n_envs - expert_obs_clipped
 
         for i in range(0, len(expert_obs)):
             expert_obs_env_i = expert_obs[i, :].copy()
             expert_actions[i, :] = expert.control(obs=expert_obs_env_i.reshape((22, 1)),
                                                   target=target_point[0:12].reshape((12, 1)), loopCount=loopCount)
-            choose_expert[i][0] = learner.choose_expert_action()
 
-        learner_actions = learner.observe(expert_chosen=choose_expert, actor_obs=learner_obs, expert_actions=expert_actions)
+        learner_actions = learner.observe(actor_obs=learner_obs, expert_actions=expert_actions)
 
         _, _ = env.step(learner_actions)
         learner.step(obs=learner_obs, rews=_, dones=_)
@@ -183,26 +197,19 @@ for update in range(1000000):
         loopCount += 1
 
         #frame_end = time.time()
-
         #wait_time = cfg['environment']['control_dt'] - (frame_end - frame_start)
         #if wait_time > 0.:
          #   time.sleep(wait_time)
 
-        #done_sum = done_sum + sum(dones)
-
-
-
-    #expert_obs = env.observe(update_mean=True)
-    #learner_obs = target_point.reshape((1, 18)) - expert_obs
-
-    mean_action_loss, mean_action_log_prob_loss = learner.update(log_this_iteration=update % 10 == 0, update=update)
+    mean_action_loss, mean_action_log_prob_loss = learner.update(log_this_iteration=update % 10 == 0, update=update,
+                                                                 log_prob_loss=log_prob_loss)
     actor.distribution.enforce_minimum_std((torch.ones(4)).to(device))
 
     end = time.time()
 
     print('----------------------------------------------------')
     print('{:>6}th iteration'.format(update))
-    print('{:<40} {:>6}'.format("beta: ", '{:0.6f}'.format(learner.beta + 0.001)))
+    print('{:<40} {:>6}'.format("beta: ", '{:0.6f}'.format(learner.beta + learner.beta_scheduler)))
     print('{:<40} {:>6}'.format("mean action log prob loss: ", '{:0.6f}'.format(mean_action_log_prob_loss)))
     print('{:<40} {:>6}'.format("mean action loss: ", '{:0.6f}'.format(mean_action_loss)))
     print('{:<40} {:>6}'.format("time elapsed in this iteration: ", '{:6.4f}'.format(end - start)))

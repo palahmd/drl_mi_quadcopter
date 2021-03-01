@@ -1,10 +1,10 @@
+from .storage import RolloutStorage
+from datetime import datetime
+from torch.utils.tensorboard import SummaryWriter
 import torch
 import torch.optim as optim
 import numpy as np
-from .storage import RolloutStorage
 import os
-from datetime import datetime
-from torch.utils.tensorboard import SummaryWriter
 
 
 class DAgger:
@@ -19,32 +19,34 @@ class DAgger:
                  beta,
                  log_dir,
                  l2_reg_weight=0.001,
-                 entropy_weight=0.0,
+                 entropy_weight=0.001,
                  learning_rate=0.001,
-                 beta_scheruler=0.005,
+                 beta_scheduler=0.005,
                  device='cpu'):
 
         # Environment parameters
         self.act_dim = act_dim
         self.num_envs = num_envs
         self.num_transitions_per_env = num_transitions_per_env
-        self.num_mini_batches = num_mini_batches
-        self.num_learning_epochs = num_learning_epochs
         self.round_num = 0
 
         # DAgger components and parameters
         self.storage = RolloutStorage(num_envs, num_transitions_per_env, actor.obs_shape, critic.obs_shape,
                                       actor.action_shape, device)
-        self.batch_sampler = self.storage.mini_batch_generator_shuffle
         self.actor = actor
         self.critic = critic
+        self.device = device
+
+        # Training parameters
+        self.num_mini_batches = num_mini_batches
+        self.num_learning_epochs = num_learning_epochs
+        self.batch_sampler = self.storage.mini_batch_generator_shuffle
+        self.optimizer = optim.Adam([*self.actor.parameters(), *self.critic.parameters()], lr=learning_rate)
         self.beta_goal = beta
         self.beta = 1
-        self.beta_scheduler = beta_scheruler
+        self.beta_scheduler = beta_scheduler
         self.l2_reg_weight = l2_reg_weight
         self.entropy_weight = entropy_weight
-        self.device = device
-        self.optimizer = optim.Adam([*self.actor.parameters(), *self.critic.parameters()], lr=learning_rate)
 
         # Log
         self.log_dir = os.path.join(log_dir, datetime.now().strftime('%b%d_%H-%M-%S'))
@@ -57,19 +59,23 @@ class DAgger:
         self.actor_obs = None
         self.expert_actions = None
         self.actions = torch.zeros((self.num_envs, self.act_dim)).to(self.device)
+        self.expert_chosen = torch.zeros((self.num_envs, 1), dtype=bool).to(self.device)
 
-    def observe(self, expert_chosen, actor_obs, expert_actions):
+    def observe(self, actor_obs, expert_actions):
         self.actor_obs = actor_obs
 
+        # set expert action and calculate leraner action
         self.expert_actions = torch.from_numpy(expert_actions).to(self.device)
         self.learner_actions, self.learner_actions_log_prob = self.actor.sample(torch.from_numpy(actor_obs).to(self.device))
-        
-        # take expert action with beta and policy action with (1-beta) prob.
-        for i in range(0, len(expert_chosen)):
-            if expert_chosen[i][0]:
+
+        # take expert action with beta prob. and policy action with (1-beta) prob.
+        self.choose_action_per_env()
+
+        for i in range(0, len(self.expert_chosen)):
+            if self.expert_chosen[i][0]:
                 self.actions[i][:] = self.expert_actions[i][:].to(self.device)
             else:
-                self.actions[i][:] = self.normalize_action(self.learner_actions[i][:]).to(self.device)
+                self.actions[i][:] = self.normalize_action_per_env(self.learner_actions[i][:]).to(self.device)
 
         return self.actions.cpu().numpy()
 
@@ -78,17 +84,19 @@ class DAgger:
         self.storage.add_transitions(self.actor_obs, obs, self.learner_actions, self.expert_actions, rews, dones, values,
                                      self.learner_actions_log_prob)
 
-    def update(self, log_this_iteration, update):
-        mean_action_loss, mean_action_log_prob_loss, infos = self._train_step_with_behavioral_cloning()
+    def update(self, log_this_iteration, update, log_prob_loss=True):
+        # calculate logging variables
+        mean_action_loss, mean_action_log_prob_loss, infos = self._train_step_with_behavioral_cloning(log_prob_loss=log_prob_loss)
 
-        # reduce beta while policy is learning
-        if self.beta > self.beta_goal:
-            self.beta -= self.beta_scheduler
+        # calculate beta for the next iteration
+        self.adjust_beta()
 
         if log_this_iteration:
             self.log({**locals(), **infos, 'it': update})
 
+        # clear storage for the next iteration
         self.storage.clear()
+
         return mean_action_loss, mean_action_log_prob_loss
 
     def log(self, variables, width=80, pad=28):
@@ -99,9 +107,48 @@ class DAgger:
         self.writer.add_scalar('Loss/action_log_prob_loss', variables['mean_action_log_prob_loss'], variables['it'])
         self.writer.add_scalar('Policy/mean_noise_std', mean_std.item(), variables['it'])
 
-    def _train_step_with_behavioral_cloning(self):
+    def normalize_action_per_env(self, actions):
+        min = torch.min(actions[:])
+        max = torch.max(actions[:])
+
+        if torch.abs(min) > 1 or torch.abs(max) > 1:
+            if torch.abs(min) < torch.abs(max):
+                actions[:] /= torch.abs(max)
+            else:
+                actions[:] /= torch.abs(min)
+
+        return actions
+
+    def normalize_action_all_envs(self, actions):
+        for i in range(0, len(actions)):
+            min = torch.min(actions[i][:])
+            max = torch.max(actions[i][:])
+
+            if torch.abs(min) > 1 or torch.abs(max) > 1:
+                if torch.abs(min) < torch.abs(max):
+                    actions[i][:] /= torch.abs(max)
+                else:
+                    actions[i][:] /= torch.abs(min)
+
+        return actions
+
+    def choose_action_per_env(self):
+        # choose expert action with beta probability
+        for i in range(0, len(self.expert_actions)):
+            if np.random.uniform(0, 1) > self.beta:
+                self.expert_chosen[i][0] = False
+            else:
+                self.expert_chosen[i][0] = True
+
+    def adjust_beta(self):
+        if self.beta > self.beta_goal:
+            self.beta -= self.beta_scheduler
+
+    """ Main training: rolling out storage and training the learner with one-step behavioral cloning """
+    def _train_step_with_behavioral_cloning(self, log_prob_loss):
         mean_action_loss = 0
         mean_action_log_prob_loss = 0
+
         for epoch in range(self.num_learning_epochs):
             for actor_obs_batch, expert_obs_batch, critic_obs_batch, actions_batch, expert_actions_batch, values_batch, \
                 advantages_batch, returns_batch, old_actions_log_prob_batch \
@@ -117,7 +164,10 @@ class DAgger:
                 entropy_loss = self.entropy_weight * -entropy_batch.mean()
                 l2_reg_loss = self.l2_reg_weight * l2_reg_norm
 
-                loss = action_log_prob_loss + entropy_loss + l2_reg_loss
+                if log_prob_loss:
+                    loss = action_log_prob_loss + entropy_loss + l2_reg_loss
+                else:
+                    loss = action_loss + entropy_loss + l2_reg_loss
 
                 self.optimizer.zero_grad()
                 loss.backward()
@@ -131,36 +181,3 @@ class DAgger:
         mean_action_log_prob_loss /=num_updates
 
         return mean_action_loss, mean_action_log_prob_loss, locals()
-
-    def normalize_action(self, actions):
-        min = torch.min(actions[:])
-        max = torch.max(actions[:])
-
-        if torch.abs(min) > 1 or torch.abs(max) > 1:
-            if torch.abs(min) < torch.abs(max):
-                actions[:] /= torch.abs(max)
-            else:
-                actions[:] /= torch.abs(min)
-
-        return actions
-
-    def normalize_action_tensor(self, actions):
-        for i in range(0, len(actions)):
-            min = torch.min(actions[i][:])
-            max = torch.max(actions[i][:])
-
-            if torch.abs(min) > 1 or torch.abs(max) > 1:
-                if torch.abs(min) < torch.abs(max):
-                    actions[i][:] /= torch.abs(max)
-                else:
-                    actions[i][:] /= torch.abs(min)
-
-        return actions
-
-    def choose_expert_action(self):
-        if np.random.uniform(0, 1) > self.beta:
-            expert_chosen = False
-        else:
-            expert_chosen = True
-
-        return expert_chosen
