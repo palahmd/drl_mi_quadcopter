@@ -58,14 +58,14 @@ act_dim = env.num_acts
 # Training param
 n_steps = math.floor(cfg['environment']['max_time'] / cfg['environment']['control_dt'])
 total_steps = n_steps * env.num_envs
-normalize_learner_obs = True
-log_prob_loss = True
+normalize_learner_obs = cfg['environment']['normalize_ob']
+log_prob_loss = cfg['environment']['log_prob_loss']
 
 # Expert: PID Controller and target point
-expert = PID(2, 10, 5.3, ob_dim_expert, act_dim, cfg['environment']['control_dt'], 1.727, normalize_action=True)
+expert = PID(2.5, 20, 6.3, ob_dim_expert, act_dim, cfg['environment']['control_dt'], 1.727, normalize_action=True)
 expert_actions = np.zeros(shape=(cfg['environment']['num_envs'], act_dim), dtype="float32")
 
-target_point = np.array([10.0, 10.0, 10.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+target_point = np.array([5.0, 5.0, 5.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
                          0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], dtype="float32")
 target_point_n_envs = np.zeros(shape=(cfg['environment']['num_envs'], ob_dim_learner), dtype="float32")
 for i in range (0, cfg['environment']['num_envs']):
@@ -73,14 +73,14 @@ for i in range (0, cfg['environment']['num_envs']):
 
 # Actor and Critic
 actor = module.Actor(module.MLP(cfg['architecture']['policy_net'],
-                                        nn.LeakyReLU,
+                                        eval(cfg['architecture']['activation_fn']),
                                         ob_dim_learner,
                                         act_dim),
                      module.MultivariateGaussianDiagonalCovariance(act_dim, 1.0),
                      device=device)
 
 critic = module.Critic(module.MLP(cfg['architecture']['value_net'],
-                                          nn.LeakyReLU,
+                                          eval(cfg['architecture']['activation_fn']),
                                           ob_dim_learner,
                                           1),
                        device=device)
@@ -89,18 +89,21 @@ critic = module.Critic(module.MLP(cfg['architecture']['value_net'],
 learner = DAgger(actor=actor, critic=critic, act_dim=act_dim,
                  num_envs=cfg['environment']['num_envs'],
                  num_transitions_per_env=n_steps,
-                 num_mini_batches=6,
-                 num_learning_epochs=8,
+                 num_mini_batches=8,
+                 num_learning_epochs=4,
                  log_dir=saver.data_dir,
                  beta=0.1,
                  l2_reg_weight=0.0,
-                 learning_rate=0.001,
-                 beta_scheduler=0.0005,
+                 entropy_weight=0.0,
+                 learning_rate=0.0005,
+                 beta_scheduler=0.005,
                  device=device)
 
 if mode == 'retrain':
     load_param(weight_path, env, actor, critic, learner.optimizer, saver.data_dir)
-    learner.round_num = weight_path.rsplit('/', 1)[1].split('_', 1)[1].rsplit('.', 1)[0]
+    #learner.beta = learner.beta - learner.beta_scheduler * float(weight_path.rsplit('/', 1)[1].split('_', 1)[1].rsplit('.', 1)[0])
+    #if learner.beta < 0.7:
+     #   learner.beta = 0.7
 
 
 """ 
@@ -117,7 +120,6 @@ for update in range(1000000):
     done_sum = 0
     average_dones = 0
 
-
     """ Evaluation and saving of the models """
     if update % cfg['environment']['eval_every_n'] == 0:
         print("Visualizing and evaluating the current policy")
@@ -129,7 +131,7 @@ for update in range(1000000):
         }, saver.data_dir+"/full_"+str(update)+'.pt')
 
         # we create another graph just to demonstrate the save/load method
-        loaded_graph = module.MLP(cfg['architecture']['policy_net'], nn.LeakyReLU, ob_dim_learner, act_dim)
+        loaded_graph = module.MLP(cfg['architecture']['policy_net'], eval(cfg['architecture']['activation_fn']), ob_dim_learner, act_dim)
         loaded_graph.load_state_dict(torch.load(saver.data_dir+"/full_"+str(update)+'.pt')['actor_architecture_state_dict'])
 
         # open raisimUnity and wait until it has started and focused on robot
@@ -142,7 +144,7 @@ for update in range(1000000):
         time.sleep(2)
 
         for step in range(int(n_steps*1.5)):
-            frame_start = time.time()
+            #frame_start = time.time()
 
             # separate and expert obs with dim 22 and (normalized) learner obs with dim 18
             expert_ob = env.observe(update_mean=False)
@@ -156,10 +158,11 @@ for update in range(1000000):
 
             _, _ = env.step(action_ll.cpu().detach().numpy())
 
-            frame_end = time.time()
-            wait_time = cfg['environment']['control_dt'] - (frame_end-frame_start)
-            if wait_time > 0.:
-                time.sleep(wait_time)
+            #frame_end = time.time()
+            #wait_time = cfg['environment']['control_dt'] - (frame_end-frame_start)
+            #if wait_time > 0.:
+             #   time.sleep(wait_time)
+            time.sleep(cfg['environment']['control_dt'])
 
         env.stop_video_recording()
         env.turn_off_visualization()
@@ -173,6 +176,7 @@ for update in range(1000000):
 
     """ Atual training """
     for step in range(n_steps):
+        env.turn_on_visualization()
 
         # separate and expert obs with dim 22 and (normalized) learner obs with dim 18
         expert_obs = env.observe(update_mean=False)
@@ -186,6 +190,7 @@ for update in range(1000000):
             expert_actions[i, :] = expert.control(obs=expert_obs_env_i.reshape((22, 1)),
                                                   target=target_point[0:12].reshape((12, 1)), loopCount=loopCount)
 
+
         learner_actions = learner.observe(actor_obs=learner_obs, expert_actions=expert_actions)
 
         _, _ = env.step(learner_actions)
@@ -195,6 +200,7 @@ for update in range(1000000):
         if loopCount == 5:
             loopCount = 0
         loopCount += 1
+        env.turn_off_visualization()
 
         #frame_end = time.time()
         #wait_time = cfg['environment']['control_dt'] - (frame_end - frame_start)
