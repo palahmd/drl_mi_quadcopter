@@ -60,7 +60,7 @@ public:
         actionStd_.setConstant(0.5*hoverThrust_);
 
         /// set pd gains
-        pid_.setTargetPoint(10, 10, 10);
+        pid_.setTargetPoint(5, 5, 5);
 
         /// Reward coefficients
         rewards_.initializeFromConfigurationFile (cfg["reward"]);

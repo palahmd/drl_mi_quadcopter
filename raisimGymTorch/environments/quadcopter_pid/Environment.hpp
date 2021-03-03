@@ -60,7 +60,7 @@ public:
         actionStd_.setConstant(1);
 
         /// set pd gains
-        pid_.setTargetPoint(10, 10, 10);
+        pid_.setTargetPoint(5, 5, 5);
 
         /// action & observation scaling
         actionMean_.setConstant(2.5);

@@ -28,7 +28,7 @@ class DAgger:
         self.act_dim = act_dim
         self.num_envs = num_envs
         self.num_transitions_per_env = num_transitions_per_env
-        self.round_num = 0
+
 
         # DAgger components and parameters
         self.storage = RolloutStorage(num_envs, num_transitions_per_env, actor.obs_shape, critic.obs_shape,
@@ -141,6 +141,12 @@ class DAgger:
                 self.expert_chosen[i][0] = True
 
     def adjust_beta(self):
+        if self.beta <= 0.8:
+            self.beta_scheduler = -abs(self.beta_scheduler)
+
+        if self.beta > (1-self.beta_scheduler):
+            self.beta_scheduler = abs(self.beta_scheduler)
+
         if self.beta > self.beta_goal:
             self.beta -= self.beta_scheduler
 
@@ -155,10 +161,11 @@ class DAgger:
                     in self.batch_sampler(self.num_mini_batches):
 
                 act_log_prob_batch, entropy_batch = self.actor.evaluate(actor_obs_batch, expert_actions_batch)
+
                 l2_reg = [torch.sum(torch.square(w)) for w in self.actor.parameters() and self.critic.parameters()]
                 l2_reg_norm = sum(l2_reg) / 2
 
-                action_loss = 0.5*((torch.exp(old_actions_log_prob_batch) - expert_actions_batch)).pow(2).mean()
+                action_loss = 0.5*(actions_batch - expert_actions_batch).pow(2).mean()
 
                 action_log_prob_loss = -act_log_prob_batch.mean()
                 entropy_loss = self.entropy_weight * -entropy_batch.mean()

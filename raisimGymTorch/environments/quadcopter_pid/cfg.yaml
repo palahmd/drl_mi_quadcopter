@@ -9,7 +9,7 @@ environment:
   num_threads: 1
   simulation_dt: 0.0025
   control_dt: 0.01
-  max_time: 10.0
+  max_time: 9
   reward:
     position:
       coeff: -0.002
