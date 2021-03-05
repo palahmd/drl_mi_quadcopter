@@ -176,7 +176,7 @@ for update in range(1000000):
 
     """ Atual training """
     for step in range(n_steps):
-        env.turn_on_visualization()
+        #env.turn_on_visualization()
 
         # separate and expert obs with dim 22 and (normalized) learner obs with dim 18
         expert_obs = env.observe(update_mean=False)
@@ -200,7 +200,7 @@ for update in range(1000000):
         if loopCount == 5:
             loopCount = 0
         loopCount += 1
-        env.turn_off_visualization()
+        #env.turn_off_visualization()
 
         #frame_end = time.time()
         #wait_time = cfg['environment']['control_dt'] - (frame_end - frame_start)

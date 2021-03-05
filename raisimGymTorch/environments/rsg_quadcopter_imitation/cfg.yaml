@@ -9,7 +9,7 @@ environment:
   simulation_dt: 0.0025
   control_dt: 0.01
   max_time: 11.0
-  normalize_ob: True
+  normalize_ob: False
   log_prob_loss: True
   reward:
     position:

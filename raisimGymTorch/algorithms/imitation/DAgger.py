@@ -40,7 +40,7 @@ class DAgger:
         # Training parameters
         self.num_mini_batches = num_mini_batches
         self.num_learning_epochs = num_learning_epochs
-        self.batch_sampler = self.storage.mini_batch_generator_shuffle
+        self.batch_sampler = self.storage.mini_batch_generator_inorder
         self.optimizer = optim.Adam([*self.actor.parameters(), *self.critic.parameters()], lr=learning_rate)
         self.beta_goal = beta
         self.beta = 1
@@ -154,6 +154,9 @@ class DAgger:
     def _train_step_with_behavioral_cloning(self, log_prob_loss):
         mean_action_loss = 0
         mean_action_log_prob_loss = 0
+        mean_entropy_loss = 0
+        mean_l2_reg_loss = 0
+        #min_action_difference = []
 
         for epoch in range(self.num_learning_epochs):
             for actor_obs_batch, expert_obs_batch, critic_obs_batch, actions_batch, expert_actions_batch, values_batch, \
@@ -165,7 +168,8 @@ class DAgger:
                 l2_reg = [torch.sum(torch.square(w)) for w in self.actor.parameters() and self.critic.parameters()]
                 l2_reg_norm = sum(l2_reg) / 2
 
-                action_loss = 0.5*(actions_batch - expert_actions_batch).pow(2).mean()
+                action_difference = actions_batch - expert_actions_batch
+                action_loss = 0.5*action_difference.pow(2).mean()
 
                 action_log_prob_loss = -act_log_prob_batch.mean()
                 entropy_loss = self.entropy_weight * -entropy_batch.mean()
@@ -182,9 +186,14 @@ class DAgger:
 
                 mean_action_loss += action_loss.item()
                 mean_action_log_prob_loss += action_log_prob_loss.item()
+                mean_entropy_loss += -entropy_batch.mean()
+                mean_l2_reg_loss += l2_reg_norm
+                #min_action_difference = torch.min(torch.abs(action_difference))
+                #max_action_difference = torch.max(torch.abs(action_difference))
+
 
         num_updates = self.num_learning_epochs * self.num_mini_batches
         mean_action_loss /= num_updates
-        mean_action_log_prob_loss /=num_updates
+        mean_action_log_prob_loss /= num_updates
 
         return mean_action_loss, mean_action_log_prob_loss, locals()
