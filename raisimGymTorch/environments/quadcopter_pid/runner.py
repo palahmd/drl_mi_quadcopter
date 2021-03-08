@@ -25,7 +25,7 @@ env = VecEnv(quadcopter_pid.RaisimGymEnv(home_path + "/../rsc", dump(cfg['enviro
 # shortcuts
 ob_dim = env.num_obs
 act_dim = env.num_acts
-target_point = np.array([2.0, 2.0, 2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]).reshape((12, 1))
+target_point = np.array([5.0, 5.0, 5.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]).reshape((12, 1))
 
 # Training
 n_steps = math.floor(cfg['environment']['max_time'] / cfg['environment']['control_dt'])

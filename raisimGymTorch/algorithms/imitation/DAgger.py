@@ -40,7 +40,7 @@ class DAgger:
         # Training parameters
         self.num_mini_batches = num_mini_batches
         self.num_learning_epochs = num_learning_epochs
-        self.batch_sampler = self.storage.mini_batch_generator_inorder
+        self.batch_sampler = self.storage.mini_batch_generator_shuffle
         self.optimizer = optim.Adam([*self.actor.parameters(), *self.critic.parameters()], lr=learning_rate)
         self.beta_goal = beta
         self.beta = 1
@@ -60,13 +60,14 @@ class DAgger:
         self.expert_actions = None
         self.actions = torch.zeros((self.num_envs, self.act_dim)).to(self.device)
         self.expert_chosen = torch.zeros((self.num_envs, 1), dtype=bool).to(self.device)
+        self.learner_actions_log_prob = torch.zeros((self.num_envs, 1)).to(self.device)
 
     def observe(self, actor_obs, expert_actions):
         self.actor_obs = actor_obs
 
         # set expert action and calculate leraner action
         self.expert_actions = torch.from_numpy(expert_actions).to(self.device)
-        self.learner_actions, self.learner_actions_log_prob = self.actor.sample(torch.from_numpy(actor_obs).to(self.device))
+        self.learner_actions = self.actor.noiseless_action(actor_obs)
 
         # take expert action with beta prob. and policy action with (1-beta) prob.
         self.choose_action_per_env()
@@ -169,7 +170,7 @@ class DAgger:
                 l2_reg_norm = sum(l2_reg) / 2
 
                 action_difference = actions_batch - expert_actions_batch
-                action_loss = 0.5*action_difference.pow(2).mean()
+                action_loss = 0.5*(actions_batch - expert_actions_batch).pow(2).mean()
 
                 action_log_prob_loss = -act_log_prob_batch.mean()
                 entropy_loss = self.entropy_weight * -entropy_batch.mean()

@@ -16,11 +16,13 @@ import torch.nn as nn
 import datetime
 import subprocess, signal
 
+
 """
 Initialization
 Here:   - Observation space normalized
         - loss function: neg. log probability
 """
+
 
 # configuration: mode, weight path and round number for beta in DAgger-Learner
 parser = argparse.ArgumentParser()
@@ -101,9 +103,6 @@ learner = DAgger(actor=actor, critic=critic, act_dim=act_dim,
 
 if mode == 'retrain':
     load_param(weight_path, env, actor, critic, learner.optimizer, saver.data_dir)
-    #learner.beta = learner.beta - learner.beta_scheduler * float(weight_path.rsplit('/', 1)[1].split('_', 1)[1].rsplit('.', 1)[0])
-    #if learner.beta < 0.7:
-     #   learner.beta = 0.7
 
 
 """ 
@@ -111,7 +110,7 @@ Training Loop
 """
 
 
-for update in range(1000000):
+for update in range(1000):
     env.reset()
     start = time.time()
 
@@ -119,6 +118,9 @@ for update in range(1000000):
     loopCount = 5
     done_sum = 0
     average_dones = 0
+
+    #if update == 0:
+     #   update =1
 
     """ Evaluation and saving of the models """
     if update % cfg['environment']['eval_every_n'] == 0:
@@ -144,9 +146,9 @@ for update in range(1000000):
         time.sleep(2)
 
         for step in range(int(n_steps*1.5)):
-            #frame_start = time.time()
 
             # separate and expert obs with dim 22 and (normalized) learner obs with dim 18
+            # TODO: WTH DID I DO? TARGET POINT - NORMALIZED STATE?!
             expert_ob = env.observe(update_mean=False)
             expert_ob_clipped = expert_ob.copy()
             expert_ob_clipped = normalize_observation(env, expert_ob_clipped, normalize_ob=normalize_learner_obs)
@@ -154,14 +156,12 @@ for update in range(1000000):
             learner_ob = target_point - expert_ob_clipped
 
             action_ll = loaded_graph.architecture(torch.from_numpy(learner_ob).cpu())
+            print(action_ll)
             action_ll = normalize_action(action_ll)
+
 
             _, _ = env.step(action_ll.cpu().detach().numpy())
 
-            #frame_end = time.time()
-            #wait_time = cfg['environment']['control_dt'] - (frame_end-frame_start)
-            #if wait_time > 0.:
-             #   time.sleep(wait_time)
             time.sleep(cfg['environment']['control_dt'])
 
         env.stop_video_recording()

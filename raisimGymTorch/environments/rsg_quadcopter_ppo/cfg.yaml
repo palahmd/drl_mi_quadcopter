@@ -3,20 +3,21 @@ record_video: yes
 
 environment:
   render: True
-# just testing commenting
-  num_envs: 100
+  num_envs: 96
   eval_every_n: 20
   num_threads: 30
   simulation_dt: 0.0025
   control_dt: 0.01
-  max_time: 5.0
+  max_time: 11.0
+  normalize_ob: True
+  log_prob_loss: True
   reward:
     position:
       coeff: -0.002
     thrust:
       coeff: 0.0001
     orientation:
-      coeff: 0.002
+      coeff: -0.002
     angularVelocity:
       coeff: -0.0001
 
@@ -24,3 +25,4 @@ environment:
 architecture:
   policy_net: [64, 64]
   value_net: [64, 64]
+  activation_fn: nn.LeakyReLU
