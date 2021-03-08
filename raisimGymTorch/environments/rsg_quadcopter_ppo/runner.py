@@ -124,9 +124,9 @@ for update in range(1000):
         time.sleep(2)
 
         for step in range(int(n_steps*1.5)):
-            expert_ob = env.observe(update_mean=True)
+            expert_ob = env.observe(update_mean=False)
             expert_ob_clipped = expert_ob.copy()
-            expert_ob_clipped = normalize_observation(env, expert_ob_clipped, normalize_ob=normalize_learner_obs)
+            #expert_ob_clipped = normalize_observation(env, expert_ob_clipped, normalize_ob=normalize_learner_obs)
             expert_ob_clipped.resize((cfg['environment']['num_envs'], 18), refcheck=False)
             obs = expert_ob_clipped
 
@@ -134,8 +134,6 @@ for update in range(1000):
             action_ll = normalize_action(action_ll)
 
             reward_ll, dones = env.step(action_ll.cpu().detach().numpy())
-
-            #print(action_ll)
 
             time.sleep(cfg['environment']['control_dt'])
 

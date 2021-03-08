@@ -97,9 +97,10 @@ public:
         controlThrusts_ = action.cast<double>();
         controlThrusts_ = controlThrusts_.cwiseProduct(actionStd_);
         controlThrusts_ += actionMean_;
+        thrusts_ = controlThrusts_;
 
-        double max_scale = controlThrusts_.maxCoeff();
-        double min_scale = controlThrusts_.minCoeff();
+        //double max_scale = controlThrusts_.maxCoeff();
+        //double min_scale = controlThrusts_.minCoeff();
 
         /*
         if ((max_scale > 1.5 * hoverThrust_) || (min_scale < 0.5 * hoverThrust_)) {
