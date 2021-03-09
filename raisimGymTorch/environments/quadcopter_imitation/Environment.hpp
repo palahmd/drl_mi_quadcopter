@@ -7,8 +7,6 @@
 #include <cstdint>
 #include <set>
 #include "../../RaisimGymEnv.hpp"
-#include "include/pidController.hpp"
-#include "include/pid_controller.cpp"
 
 
 namespace raisim {
@@ -43,6 +41,7 @@ public:
         actionMean_.setZero(actionDim_);
         actionStd_.setZero(actionDim_);
         obDouble_.setZero(obDim_);
+        targetPoint_.setZero(obDim_);
 
         /// nominal configuration of quadcopter: [0]-[2]: center of mass, [3]-[6]: quanternions, [7]-[10]: rotors
         gc_init_ << 0.0, 0.0, 0.135, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
@@ -58,9 +57,9 @@ public:
         /// action & observation scaling
         actionMean_.setConstant(hoverThrust_);
         actionStd_.setConstant(0.5*hoverThrust_);
+        targetPoint_ << 5.0, 5.0, 5.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
 
-        /// set pd gains
-        pid_.setTargetPoint(5, 5, 5);
+        
 
         /// Reward coefficients
         rewards_.initializeFromConfigurationFile (cfg["reward"]);
@@ -71,7 +70,7 @@ public:
             server_->launchServer();
             server_->focusOn(robot_);
             auto visPoint = server_->addVisualSphere("visPoint", 0.25, 0.8, 0, 0);
-            visPoint->setPosition(pid_.targetPoint.head(3));
+            visPoint->setPosition(targetPoint_.head(3));
         }
     }
 
@@ -102,9 +101,9 @@ public:
 
         updateObservation();
 
-        rewards_.record("position", std::sqrt(bodyPos_.squaredNorm()));
+        rewards_.record("position", std::sqrt((targetPoint_.head(3) - bodyPos_).squaredNorm()));
         rewards_.record("thrust", thrusts_.squaredNorm());
-        rewards_.record("orientation", std::acos(bodyRot_(2,1)));
+        rewards_.record("orientation", std::abs(std::acos(bodyRot_(2,1))));
         rewards_.record("angularVelocity", bodyAngVel_.squaredNorm());
 
         return rewards_.sum();
@@ -177,8 +176,6 @@ public:
         return false;
     }
 
-    pidController pid_ = pidController(2, 6, 10);
-
     raisim::Mat<3,3> worldRot_;
     raisim::Vec<4> quat_;
     Eigen::Vector3d bodyPos_, bodyLinVel_, bodyAngVel_;
@@ -203,12 +200,11 @@ public:
     raisim::ArticulatedSystem* robot_;
     Eigen::VectorXd gc_init_, gv_init_, gc_, gv_;
     double terminalRewardCoeff_ = -10.;
-    Eigen::VectorXd obDouble_;
+    Eigen::VectorXd obDouble_, targetPoint_;
     Eigen::Vector4d actionMean_, actionStd_;
     std::set<size_t> baseIndex_;
     raisim::Reward rewards_;
 
-    
 };
 }
 

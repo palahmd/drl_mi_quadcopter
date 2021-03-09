@@ -28,7 +28,7 @@ public:
         gcDim_ = robot_->getGeneralizedCoordinateDim();
         gvDim_ = robot_->getDOF();
         nRotors_ = gvDim_ - 6;
-        obDim_ = 18;
+        obDim_ = 22;
         actionDim_ = nRotors_;
 
         /// initialize containers
@@ -40,11 +40,11 @@ public:
         actionMean_.setZero(actionDim_);
         actionStd_.setZero(actionDim_);
         obDouble_.setZero(obDim_);
-        goalPoint_.setZero(obDim_);
+        targetPoint_.setZero(obDim_);
 
         /// nominal configuration of quadcopter: [0]-[2]: center of mass, [3]-[6]: quanternions, [7]-[10]: rotors
         gc_init_ << 0.0, 0.0, 0.135, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
-        gv_init_ << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -4000 * rpm_, 4000 * rpm_, -4000 * rpm_, 4000 * rpm_;
+        gv_init_ << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -400 * rpm_, 400 * rpm_, -400 * rpm_, 400 * rpm_;
 
         /// initialize rotor thrusts_ and conversion matrix for generated forces and torques
         thrusts_.setZero(nRotors_);
@@ -57,7 +57,7 @@ public:
         /// action & observation scaling
         actionMean_.setConstant(hoverThrust_);
         actionStd_.setConstant(0.5*hoverThrust_);
-        goalPoint_ << 10.0, 10.0, 10.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
+        targetPoint_ << 5.0, 5.0, 5.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
 
         /// Reward coefficients
         rewards_.initializeFromConfigurationFile (cfg["reward"]);
@@ -76,9 +76,7 @@ public:
 
             /// visualize target point
             auto visPoint = server_->addVisualSphere("visPoint", 0.25, 0.8, 0, 0);
-            visPoint->setPosition(goalPoint_.head(3));
-
-            raisim::MSLEEP(1000);
+            visPoint->setPosition(targetPoint_.head(3));
         }
     }
 
@@ -87,6 +85,9 @@ public:
     void reset() final {
         robot_->setState(gc_init_, gv_init_);
         updateObservation();
+        if (visualizable_) {
+            server_->focusOn(robot_);
+        }
     }
 
     float step(const Eigen::Ref<EigenVec> &action) final {
@@ -94,17 +95,22 @@ public:
         controlThrusts_ = action.cast<double>();
         controlThrusts_ = controlThrusts_.cwiseProduct(actionStd_);
         controlThrusts_ += actionMean_;
+        thrusts_ = controlThrusts_;
 
-        double max_scale = controlThrusts_.maxCoeff();
-        double min_scale = controlThrusts_.minCoeff();
+        //double max_scale = controlThrusts_.maxCoeff();
+        //double min_scale = controlThrusts_.minCoeff();
 
-        if (max_scale > (1.5 * hoverThrust_)){
-            controlThrusts_ = 1.5 / max_scale * hoverThrust_ * controlThrusts_;
-        }
-        else if (min_scale < 0.5 * hoverThrust_) {
-            controlThrusts_ = 0.5 / min_scale * hoverThrust_ * controlThrusts_;
-        }
+        /*
+        if ((max_scale > 1.5 * hoverThrust_) || (min_scale < 0.5 * hoverThrust_)) {
+            if (std::abs(min_scale) < std::abs(max_scale)) {
+                controlThrusts_ = 1.5 / max_scale * hoverThrust_ * controlThrusts_;
+            }
+            else {
+                controlThrusts_ = 0.5 / min_scale * hoverThrust_ * controlThrusts_;
+            }
+        }*/
 
+        /*
         /// motor model
         for (int i = 0; i<4; i++){
             if (thrusts_[i]<controlThrusts_[i]) {  // time constant for increasing rotor speed
@@ -112,7 +118,7 @@ public:
             } else if (thrusts_[i]>controlThrusts_[i]){   // time constant for decreasing rotor speed
                 thrusts_[i] = thrusts_[i] + (controlThrusts_[i] - thrusts_[i]) * simulation_dt_ / 0.025;
             }
-        }
+        }*/
 
         applyThrusts();
 
@@ -124,9 +130,9 @@ public:
 
         updateObservation();
 
-        rewards_.record("position", std::sqrt(bodyPos_.squaredNorm()));
+        rewards_.record("position", std::sqrt((targetPoint_.head(3) - bodyPos_).squaredNorm()));
         rewards_.record("thrust", thrusts_.squaredNorm());
-        rewards_.record("orientation", std::acos(bodyRot_(2,1)));
+        rewards_.record("orientation", std::abs(std::acos(bodyRot_(2,1))));
         rewards_.record("angularVelocity", bodyAngVel_.squaredNorm());
 
         return rewards_.sum();
@@ -141,6 +147,7 @@ public:
         bodyRot_ = worldRot_.e().transpose();
         bodyLinVel_ = bodyRot_ * gv_.segment(0,3);
         bodyAngVel_ = bodyRot_ * gv_.segment(3,3);
+        robot_->getBaseOrientation(quat_);
 
         /// observation vector (later for RL-Algorithm)
         // World Frame position: obDouble_[0]-obDouble_[2], ob_q[0]-ob_q[2]
@@ -148,10 +155,15 @@ public:
             obDouble_[i] = bodyPos_[i];
         }
 
+        /// observation vector (later for RL-Algorithm)
+        for (size_t i = 0; i < 3; i++) {
+            obDouble_[i] = bodyPos_[i];
+        }
+
         // World Frame rotation Matrix and quaternion: obDouble_[9]-obDouble_[17], ob_q[9]-ob_q[12]
         for (size_t i = 0; i < 3; i++) {
             for (size_t j = 0; j<3; j++){
-                obDouble_[i + j + 3] = bodyRot_(i,j);
+                obDouble_[j + (i+1)*3] = bodyRot_(i,j);
             }
         }
 
@@ -163,12 +175,16 @@ public:
         for (size_t i = 0; i < 3; i++) {
             obDouble_[i + 15] = bodyAngVel_[i];
         }
+
+        for (size_t i = 0; i < 4; i++) {
+            obDouble_[i + 18] = quat_.e()[i];
+        }
     }
 
 
   void observe(Eigen::Ref<EigenVec> ob) final {
     /// convert it to float
-    obDouble_ -= goalPoint_;
+    obDouble_ -= targetPoint_;
     ob = obDouble_.cast<float>();
   }
 
@@ -181,13 +197,17 @@ public:
         torques_worldFrame_.e() = worldRot_.e() * torques_baseFrame_;
         forces_worldFrame_.e() = worldRot_.e() * forces_baseFrame_;
 
-        genForces_.head(6) << forces_worldFrame_.e(), torques_worldFrame_.e();
+
+        genForces_.head(3) = forces_worldFrame_.e();
+        genForces_.segment(3,3) = torques_worldFrame_.e();
         robot_->setGeneralizedForce(genForces_);
 
+
         /// this will visualize the applied forces and torques
-        // robot_->setExternalForce(0, forces_worldFrame_);
-        // robot_->setExternalTorque(0, torques_worldFrame_);
+        //robot_->setExternalForce(0, forces_worldFrame_);
+        //robot_->setExternalTorque(0, torques_worldFrame_);
     }
+
     bool isTerminalState(float& terminalReward) final {
         terminalReward = float(terminalRewardCoeff_);
 
@@ -210,9 +230,10 @@ private:
 
 
     /// dynamics variables
+    raisim::Vec<4> quat_;
     int gcDim_, gvDim_, nRotors_;
     Eigen::VectorXd gc_init_, gv_init_, gc_, gv_;
-    Eigen::VectorXd obDouble_, goalPoint_;
+    Eigen::VectorXd obDouble_, targetPoint_;
     Eigen::Vector4d actionMean_, actionStd_;
 
     raisim::Mat<3,3> worldRot_;

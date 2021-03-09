@@ -1,3 +1,3 @@
 cd ../environments/quadcopter_pid
-python runner.py
+python pid_runner.py
 cd ../../scripts
