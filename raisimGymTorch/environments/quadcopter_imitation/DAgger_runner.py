@@ -100,6 +100,7 @@ learner = DAgger(actor=actor, critic=critic, act_dim=act_dim,
                  learning_rate=cfg['hyperparam']['learning_rate'],
                  beta_scheduler=cfg['hyperparam']['beta_scheduler'],
                  log_prob_loss=cfg['hyperparam']['log_prob_loss'],
+                 deterministic_policy=cfg['architecture']['deterministic_policy'],
                  device=device)
 
 if mode == 'retrain':
@@ -173,8 +174,7 @@ for update in range(1000):
 
     """ Atual training """
     for step in range(n_steps):
-        env.turn_on_visualization()
-        learner.beta = 0
+#        env.turn_on_visualization()
 
         # separate and expert obs with dim 22 and (normalized) learner obs with dim 18
         expert_obs = env.observe()
@@ -198,7 +198,7 @@ for update in range(1000):
         if loopCount == 5:
             loopCount = 0
         loopCount += 1
-        env.turn_off_visualization()
+#        env.turn_off_visualization()
 
         #frame_end = time.time()
         #wait_time = cfg['environment']['control_dt'] - (frame_end - frame_start)

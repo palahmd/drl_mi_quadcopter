@@ -128,7 +128,7 @@ class PPO:
 
                 # Surrogate loss
                 if self.deterministic_policy:
-                    new_actions_batch = self.actor.noiseless_action(actor_obs_batch)
+                    new_actions_batch = self.actor.self.actor.architecture.architecture(actor_obs_batch)
                     ratio = new_actions_batch / torch.squeeze(actions_batch)
                 else:
                     ratio = torch.exp(actions_log_prob_batch - torch.squeeze(old_actions_log_prob_batch))

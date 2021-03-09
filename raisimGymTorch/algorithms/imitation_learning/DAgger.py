@@ -23,6 +23,7 @@ class DAgger:
                  learning_rate=0.001,
                  beta_scheduler=0.005,
                  log_prob_loss=True,
+                 deterministic_policy=False,
                  device='cpu'):
 
         # Environment parameters
@@ -31,12 +32,13 @@ class DAgger:
         self.num_transitions_per_env = num_transitions_per_env
 
 
-        # DAgger components and parameters
+        # DAgger components
         self.storage = RolloutStorage(num_envs, num_transitions_per_env, actor.obs_shape, critic.obs_shape,
                                       actor.action_shape, device)
         self.actor = actor
         self.critic = critic
         self.device = device
+        self.deterministic_policy = deterministic_policy
 
         # Training parameters
         self.num_mini_batches = num_mini_batches
@@ -48,7 +50,10 @@ class DAgger:
         self.beta_scheduler = beta_scheduler
         self.l2_reg_weight = l2_reg_weight
         self.entropy_weight = entropy_weight
-        self.log_prob_loss = log_prob_loss
+        if self.deterministic_policy == True:
+            self.log_prob_loss = False
+        else:
+            self.log_prob_loss = log_prob_loss
 
         # Log
         self.log_dir = os.path.join(log_dir, datetime.now().strftime('%b%d_%H-%M-%S'))
@@ -69,7 +74,11 @@ class DAgger:
 
         # set expert action and calculate leraner action
         self.expert_actions = torch.from_numpy(expert_actions).to(self.device)
-        self.learner_actions, self.learner_actions_log_prob = self.actor.sample(torch.from_numpy(actor_obs).to(self.device))
+
+        if self.deterministic_policy:
+            self.learner_actions = self.actor.noiseless_action(actor_obs)
+        else:
+            self.learner_actions, self.learner_actions_log_prob = self.actor.sample(torch.from_numpy(actor_obs).to(self.device))
 
         # take expert action with beta prob. and policy action with (1-beta) prob.
         self.choose_action_per_env()
@@ -175,11 +184,12 @@ class DAgger:
                     in self.batch_sampler(self.num_mini_batches):
 
                 act_log_prob_batch, entropy_batch = self.actor.evaluate(actor_obs_batch, expert_actions_batch)
+                new_actions_batch = self.actor.architecture.architecture(actor_obs_batch)
 
                 l2_reg = [torch.sum(torch.square(w)) for w in self.actor.parameters() and self.critic.parameters()]
                 l2_reg_norm = sum(l2_reg) / 2
 
-                action_loss = 0.5*(actions_batch - expert_actions_batch).pow(2).mean()
+                action_loss = 0.5*(new_actions_batch - expert_actions_batch).pow(2).mean()
 
                 action_log_prob_loss = -act_log_prob_batch.mean()
                 entropy_loss = self.entropy_weight * -entropy_batch.mean()

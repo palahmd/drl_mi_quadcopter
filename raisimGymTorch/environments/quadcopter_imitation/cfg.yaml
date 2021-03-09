@@ -28,7 +28,7 @@ architecture:
   policy_net: [64, 64]
   value_net: [64, 64]
   activation_fn: nn.LeakyReLU
-  deterministic_policy: False
+  deterministic_policy: True
 
 
 hyperparam:
