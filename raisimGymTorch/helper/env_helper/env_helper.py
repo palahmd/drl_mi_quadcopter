@@ -1,19 +1,27 @@
 import torch
 import numpy as np
 
-def normalize_action(actions):
-    for i in range(0, len(actions)):
-        min = torch.min(actions[i][:])
-        max = torch.max(actions[i][:])
+# action scaling
+def scale_action(actions, clip_action=False):
+    if clip_action:
+        return np.clip(actions.numpy(), -1, 1)
+        
+    else:
+        for i in range(0, len(actions)):
+            min = torch.min(actions[i][:])
+            max = torch.max(actions[i][:])
 
-        if torch.abs(min) > 1 or torch.abs(max) > 1:
-            if torch.abs(min) < torch.abs(max):
-                actions[i][:] /= torch.abs(max)
-            else:
-                actions[i][:] /= torch.abs(min)
+            if torch.abs(min) > 1 or torch.abs(max) > 1:
+                if torch.abs(min) < torch.abs(max):
+                    actions[i][:] /= torch.abs(max)
+                else:
+                    actions[i][:] /= torch.abs(min)
 
-    return actions
+        return actions.cpu().detach().numpy()
+    
 
+# works as an environment wrapper, uses methods of env to normalize the observation and update the RMS.
+# when to use: if a target point is defined in the runner file and needs to be calculated into the observation
 def normalize_observation(env, observation, normalize_ob=True, update_mean=True):
     if normalize_ob == True:
         if update_mean:

@@ -7,7 +7,7 @@
 #include <cstdint>
 #include <set>
 #include "../../RaisimGymEnv.hpp"
-#include <iostream>
+
 
 namespace raisim {
 
@@ -17,12 +17,13 @@ public:
 
     explicit ENVIRONMENT(const std::string &resourceDir, const Yaml::Node &cfg, bool visualizable) :
             RaisimGymEnv(resourceDir, cfg), visualizable_(visualizable) {
+
         /// add objects
         robot_ = world_->addArticulatedSystem(
                 resourceDir_ + "/ITM-quadcopter/urdf/ITM-quadcopter.urdf");
         robot_->setName("Quaddy");
         robot_->setIntegrationScheme(raisim::ArticulatedSystem::IntegrationScheme::RUNGE_KUTTA_4);
-        world_->addGround();
+        world_->addGround(0);
 
         /// get robot data
         gcDim_ = robot_->getGeneralizedCoordinateDim();
@@ -40,7 +41,7 @@ public:
         actionMean_.setZero(actionDim_);
         actionStd_.setZero(actionDim_);
         obDouble_.setZero(obDim_);
-        goalPoint_.setZero(obDim_);
+        targetPoint_.setZero(obDim_);
 
         /// nominal configuration of quadcopter: [0]-[2]: center of mass, [3]-[6]: quanternions, [7]-[10]: rotors
         gc_init_ << 0.0, 0.0, 0.135, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
@@ -48,7 +49,6 @@ public:
 
         /// initialize rotor thrusts_ and conversion matrix for generated forces and torques
         thrusts_.setZero(nRotors_);
-        controlThrusts_.setZero(nRotors_);
         thrusts2TorquesAndForces_ << 1, 1, 1, 1,
                 rotorPos_, -rotorPos_, -rotorPos_, rotorPos_,
                 -rotorPos_, -rotorPos_, rotorPos_, rotorPos_,
@@ -57,28 +57,20 @@ public:
         /// action & observation scaling
         actionMean_.setConstant(hoverThrust_);
         actionStd_.setConstant(0.5*hoverThrust_);
-        goalPoint_ << 5.0, 5.0, 5.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
+        targetPoint_ << 5.0, 5.0, 5.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
+
+        
 
         /// Reward coefficients
         rewards_.initializeFromConfigurationFile (cfg["reward"]);
-
-        /// indices of links that should not make contact with ground - all links and bodies
-        bodyIndices_.insert(robot_->getBodyIdx("rotor_0"));
-        bodyIndices_.insert(robot_->getBodyIdx("rotor_1"));
-        bodyIndices_.insert(robot_->getBodyIdx("rotor_2"));
-        bodyIndices_.insert(robot_->getBodyIdx("rotor_3"));
-
+                
         /// visualize if it is the first environment
         if (visualizable_) {
             server_ = std::make_unique<raisim::RaisimServer>(world_.get());
             server_->launchServer();
             server_->focusOn(robot_);
-
-            /// visualize target point
             auto visPoint = server_->addVisualSphere("visPoint", 0.25, 0.8, 0, 0);
-            visPoint->setPosition(goalPoint_.head(3));
-
-            raisim::MSLEEP(1000);
+            visPoint->setPosition(targetPoint_.head(3));
         }
     }
 
@@ -94,35 +86,12 @@ public:
 
     float step(const Eigen::Ref<EigenVec> &action) final {
         /// action scaling
-        controlThrusts_ = action.cast<double>();
-        controlThrusts_ = controlThrusts_.cwiseProduct(actionStd_);
-        controlThrusts_ += actionMean_;
-        thrusts_ = controlThrusts_;
-
-        //double max_scale = controlThrusts_.maxCoeff();
-        //double min_scale = controlThrusts_.minCoeff();
-
-        /*
-        if ((max_scale > 1.5 * hoverThrust_) || (min_scale < 0.5 * hoverThrust_)) {
-            if (std::abs(min_scale) < std::abs(max_scale)) {
-                controlThrusts_ = 1.5 / max_scale * hoverThrust_ * controlThrusts_;
-            }
-            else {
-                controlThrusts_ = 0.5 / min_scale * hoverThrust_ * controlThrusts_;
-            }
-        }*/
-
-        /*
-        /// motor model
-        for (int i = 0; i<4; i++){
-            if (thrusts_[i]<controlThrusts_[i]) {  // time constant for increasing rotor speed
-                thrusts_[i] = thrusts_[i] + (controlThrusts_[i] - thrusts_[i]) * simulation_dt_ / 0.0125;
-            } else if (thrusts_[i]>controlThrusts_[i]){   // time constant for decreasing rotor speed
-                thrusts_[i] = thrusts_[i] + (controlThrusts_[i] - thrusts_[i]) * simulation_dt_ / 0.025;
-            }
-        }*/
+        thrusts_ = action.cast<double>();
+        thrusts_ = thrusts_.cwiseProduct(actionStd_);
+        thrusts_ = thrusts_ + actionMean_;
 
         applyThrusts();
+
 
         for (int i = 0; i < int(control_dt_ / simulation_dt_ + 1e-10); i++) {
             if (server_) server_->lockVisualizationServerMutex();
@@ -132,7 +101,7 @@ public:
 
         updateObservation();
 
-        rewards_.record("position", std::sqrt((goalPoint_.head(3) - bodyPos_).squaredNorm()));
+        rewards_.record("position", std::sqrt((targetPoint_.head(3) - bodyPos_).squaredNorm()));
         rewards_.record("thrust", thrusts_.squaredNorm());
         rewards_.record("orientation", std::abs(std::acos(bodyRot_(2,1))));
         rewards_.record("angularVelocity", bodyAngVel_.squaredNorm());
@@ -150,12 +119,6 @@ public:
         bodyLinVel_ = bodyRot_ * gv_.segment(0,3);
         bodyAngVel_ = bodyRot_ * gv_.segment(3,3);
         robot_->getBaseOrientation(quat_);
-
-        /// observation vector (later for RL-Algorithm)
-        // World Frame position: obDouble_[0]-obDouble_[2], ob_q[0]-ob_q[2]
-        for (size_t i = 0; i < 3; i++) {
-            obDouble_[i] = bodyPos_[i];
-        }
 
         /// observation vector (later for RL-Algorithm)
         for (size_t i = 0; i < 3; i++) {
@@ -184,11 +147,10 @@ public:
     }
 
 
-  void observe(Eigen::Ref<EigenVec> ob) final {
-    /// convert it to float
-    obDouble_ = goalPoint_ - obDouble_;
-    ob = obDouble_.cast<float>();
-  }
+    void observe(Eigen::Ref<EigenVec> ob) final {
+        /// convert it to float
+        ob = obDouble_.cast<float>();
+    }
 
     void applyThrusts(){
         /// calculate Forces and Torques
@@ -204,65 +166,45 @@ public:
         robot_->setGeneralizedForce(genForces_);
 
         /// this will visualize the applied forces and torques
-        /// TODO: SET EXTERNAL FORCE FOR VISUALIZATION
         // robot_->setExternalForce(0, forces_worldFrame_);
         // robot_->setExternalTorque(0, torques_worldFrame_);
     }
-
     bool isTerminalState(float& terminalReward) final {
         terminalReward = float(terminalRewardCoeff_);
-
-
-        for(auto& contact: robot_->getContacts()) {
-            if (bodyIndices_.find(contact.getlocalBodyIndex()) == bodyIndices_.end())
-                return true;
-        }
 
         terminalReward = 0.f;
         return false;
     }
 
-
-private:
-
-    /// simulation objects and parameters
-    raisim::ArticulatedSystem* robot_;
-    bool visualizable_ = true;
-
-
-    /// dynamics variables
-    raisim::Vec<4> quat_;
-    int gcDim_, gvDim_, nRotors_;
-    Eigen::VectorXd gc_init_, gv_init_, gc_, gv_;
-    Eigen::VectorXd obDouble_, goalPoint_;
-    Eigen::Vector4d actionMean_, actionStd_;
-
     raisim::Mat<3,3> worldRot_;
+    raisim::Vec<4> quat_;
     Eigen::Vector3d bodyPos_, bodyLinVel_, bodyAngVel_;
     Eigen::Matrix3d bodyRot_;
 
-    Eigen::VectorXd thrusts_, controlThrusts_;
+    Eigen::VectorXd thrusts_;
     Eigen::Matrix4d thrusts2TorquesAndForces_;
     Eigen::Vector4d torquesAndForces_;
     Eigen::Vector3d torques_baseFrame_, forces_baseFrame_;
     raisim::Vec<3> torques_worldFrame_, forces_worldFrame_;
     Eigen::VectorXd genForces_;
 
-
     /// quadcopter model parameters
     const double rotorPos_ = 0.17104913036744201, momConst_ = 0.016;
     const double rps_ = 2 * M_PI, rpm_ = rps_/60;
     const double g_ = 9.81, m_ = 1.727;
     const double hoverThrust_ = m_ * g_ / 4;
+    int loopCount_;
 
-
-    /// reward parameters
+    int gcDim_, gvDim_, nRotors_;
+    bool visualizable_ = true;
+    raisim::ArticulatedSystem* robot_;
+    Eigen::VectorXd gc_init_, gv_init_, gc_, gv_;
+    double terminalRewardCoeff_ = -10.;
+    Eigen::VectorXd obDouble_, targetPoint_;
+    Eigen::Vector4d actionMean_, actionStd_;
+    std::set<size_t> baseIndex_;
     raisim::Reward rewards_;
-    double terminalRewardCoeff_ = -1.;
-    std::set<size_t> bodyIndices_;
 
 };
 }
-
-
 

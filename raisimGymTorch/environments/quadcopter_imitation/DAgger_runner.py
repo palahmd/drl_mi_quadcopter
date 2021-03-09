@@ -2,10 +2,10 @@ from ruamel.yaml import YAML, dump, RoundTripDumper
 from raisimGymTorch.env.bin import rsg_quadcopter_imitation
 from raisimGymTorch.env.RaisimGymVecEnv import RaisimGymVecEnv as VecEnv
 from raisimGymTorch.algo.pid_controller.pid_controller import PID
-from raisimGymTorch.algo.imitation.DAgger import DAgger
+from raisimGymTorch.algo.imitation_learning.DAgger import DAgger
 from raisimGymTorch.helper.raisim_gym_helper import ConfigurationSaver, load_param, tensorboard_launcher
-from raisimGymTorch.helper.env_helper.env_helper import normalize_action, normalize_observation
-import raisimGymTorch.algo.imitation.module as module
+from raisimGymTorch.helper.env_helper.env_helper import scale_action, normalize_observation
+import raisimGymTorch.algo.shared_modules.actor_critic as module
 import os
 import math
 import time
@@ -45,8 +45,9 @@ saver = ConfigurationSaver(log_dir=home_path + "/training/imitation",
                            save_items=[task_path + "/cfg.yaml", task_path + "/Environment.hpp"])
 #tensorboard_launcher(saver.data_dir+"/..")  # press refresh (F5) after the first ppo update
 
-# config
+# config and config related options
 cfg = YAML().load(open(task_path + "/cfg.yaml", 'r'))
+
 
 # create environment from the configuration file
 env = VecEnv(rsg_quadcopter_imitation.RaisimGymEnv(home_path + "/../rsc", dump(cfg['environment'], Dumper=RoundTripDumper)),
@@ -60,16 +61,15 @@ act_dim = env.num_acts
 # Training param
 n_steps = math.floor(cfg['environment']['max_time'] / cfg['environment']['control_dt'])
 total_steps = n_steps * env.num_envs
-normalize_learner_obs = cfg['environment']['normalize_ob']
-log_prob_loss = cfg['environment']['log_prob_loss']
+
 
 # Expert: PID Controller and target point
 expert = PID(2.5, 20, 6.3, ob_dim_expert, act_dim, cfg['environment']['control_dt'], 1.727, normalize_action=True)
 expert_actions = np.zeros(shape=(cfg['environment']['num_envs'], act_dim), dtype="float32")
 
 target_point = np.array([5.0, 5.0, 5.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                         0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], dtype="float32")
-target_point_n_envs = np.zeros(shape=(cfg['environment']['num_envs'], ob_dim_learner), dtype="float32")
+                         0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], dtype="float32")
+target_point_n_envs = np.zeros(shape=(cfg['environment']['num_envs'], ob_dim_expert), dtype="float32")
 for i in range (0, cfg['environment']['num_envs']):
     target_point_n_envs[i, :] = target_point
 
@@ -91,14 +91,15 @@ critic = module.Critic(module.MLP(cfg['architecture']['value_net'],
 learner = DAgger(actor=actor, critic=critic, act_dim=act_dim,
                  num_envs=cfg['environment']['num_envs'],
                  num_transitions_per_env=n_steps,
-                 num_mini_batches=8,
-                 num_learning_epochs=4,
+                 num_mini_batches=cfg['hyperparam']['num_mini_batches'],
+                 num_learning_epochs=cfg['hyperparam']['num_learning_epochs'],
                  log_dir=saver.data_dir,
-                 beta=0.1,
-                 l2_reg_weight=0.0,
-                 entropy_weight=0.0,
-                 learning_rate=0.0005,
-                 beta_scheduler=0.005,
+                 beta=cfg['hyperparam']['Beta'],
+                 l2_reg_weight=cfg['hyperparam']['l2_reg_weight'],
+                 entropy_weight=cfg['hyperparam']['entropy_weight'],
+                 learning_rate=cfg['hyperparam']['learning_rate'],
+                 beta_scheduler=cfg['hyperparam']['beta_scheduler'],
+                 log_prob_loss=cfg['hyperparam']['log_prob_loss'],
                  device=device)
 
 if mode == 'retrain':
@@ -116,11 +117,9 @@ for update in range(1000):
 
     # tmeps
     loopCount = 5
-    done_sum = 0
-    average_dones = 0
 
-    #if update == 0:
-     #   update =1
+    if update == 0:
+        update =1
 
     """ Evaluation and saving of the models """
     if update % cfg['environment']['eval_every_n'] == 0:
@@ -148,19 +147,17 @@ for update in range(1000):
         for step in range(int(n_steps*1.5)):
 
             # separate and expert obs with dim 22 and (normalized) learner obs with dim 18
-            # TODO: WTH DID I DO? TARGET POINT - NORMALIZED STATE?!
-            expert_ob = env.observe(update_mean=False)
-            expert_ob_clipped = expert_ob.copy()
-            expert_ob_clipped = normalize_observation(env, expert_ob_clipped, normalize_ob=normalize_learner_obs)
-            expert_ob_clipped.resize((cfg['environment']['num_envs'], 18), refcheck=False)
-            learner_ob = target_point - expert_ob_clipped
+            expert_obs = env.observe()
+            learner_obs = expert_obs.copy()
+            learner_obs -= target_point
+            learner_obs = normalize_observation(env, learner_obs, normalize_ob=cfg['environment']['normalize_ob'])
+            learner_obs.resize((cfg['environment']['num_envs'], 18), refcheck=False)
 
-            action_ll = loaded_graph.architecture(torch.from_numpy(learner_ob).cpu())
-            print(action_ll)
-            action_ll = normalize_action(action_ll)
+            action_ll = loaded_graph.architecture(torch.from_numpy(learner_obs).cpu())
+            action_ll = scale_action(action_ll, clip_action=cfg['environment']['clip_action'])
 
 
-            _, _ = env.step(action_ll.cpu().detach().numpy())
+            _, _ = env.step(action_ll)
 
             time.sleep(cfg['environment']['control_dt'])
 
@@ -176,14 +173,15 @@ for update in range(1000):
 
     """ Atual training """
     for step in range(n_steps):
-        #env.turn_on_visualization()
+        env.turn_on_visualization()
+        learner.beta = 0
 
         # separate and expert obs with dim 22 and (normalized) learner obs with dim 18
-        expert_obs = env.observe(update_mean=False)
-        expert_obs_clipped = expert_obs.copy()
-        expert_obs_clipped = normalize_observation(env, expert_obs_clipped, normalize_ob=normalize_learner_obs)
-        expert_obs_clipped.resize((cfg['environment']['num_envs'], 18), refcheck=False)
-        learner_obs = target_point_n_envs - expert_obs_clipped
+        expert_obs = env.observe()
+        learner_obs = expert_obs.copy()
+        learner_obs -= target_point
+        learner_obs = normalize_observation(env, learner_obs, normalize_ob=cfg['environment']['normalize_ob'])
+        learner_obs.resize((cfg['environment']['num_envs'], 18), refcheck=False)
 
         for i in range(0, len(expert_obs)):
             expert_obs_env_i = expert_obs[i, :].copy()
@@ -193,22 +191,22 @@ for update in range(1000):
 
         learner_actions = learner.observe(actor_obs=learner_obs, expert_actions=expert_actions)
 
-        _, _ = env.step(learner_actions)
-        learner.step(obs=learner_obs, rews=_, dones=_)
+        reward, dones = env.step(learner_actions)
+        learner.step(obs=learner_obs, rews=reward, dones=dones)
 
         # for outter control loop
         if loopCount == 5:
             loopCount = 0
         loopCount += 1
-        #env.turn_off_visualization()
+        env.turn_off_visualization()
 
         #frame_end = time.time()
         #wait_time = cfg['environment']['control_dt'] - (frame_end - frame_start)
         #if wait_time > 0.:
          #   time.sleep(wait_time)
 
-    mean_action_loss, mean_action_log_prob_loss = learner.update(log_this_iteration=update % 10 == 0, update=update,
-                                                                 log_prob_loss=log_prob_loss)
+    mean_loss, mean_action_loss, mean_action_log_prob_loss = learner.update(log_this_iteration=update % 10 == 0, 
+                                                                            update=update)
     actor.distribution.enforce_minimum_std((torch.ones(4)).to(device))
 
     end = time.time()
@@ -216,6 +214,7 @@ for update in range(1000):
     print('----------------------------------------------------')
     print('{:>6}th iteration'.format(update))
     print('{:<40} {:>6}'.format("beta: ", '{:0.6f}'.format(learner.beta + learner.beta_scheduler)))
+    print('{:<40} {:>6}'.format("mean loss: ", '{:0.6f}'.format(mean_loss)))
     print('{:<40} {:>6}'.format("mean action log prob loss: ", '{:0.6f}'.format(mean_action_log_prob_loss)))
     print('{:<40} {:>6}'.format("mean action loss: ", '{:0.6f}'.format(mean_action_loss)))
     print('{:<40} {:>6}'.format("time elapsed in this iteration: ", '{:6.4f}'.format(end - start)))

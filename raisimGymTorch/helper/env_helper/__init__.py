@@ -1,1 +1,1 @@
-from .env_helper import normalize_action, normalize_observation
+from .env_helper import scale_action, normalize_observation

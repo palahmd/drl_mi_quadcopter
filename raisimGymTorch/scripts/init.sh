@@ -3,14 +3,13 @@
 
 if grep -Fxq "export RSG_PATH=$RSG_PATH" ~/.bashrc
 then 
-	echo "raisimGymTorch Path is already existing in .bashrc"
+	echo "raisimGymTorch Path is already added to ~/.bashrc"
 	RSG_PATH=$RSG_PATH
 else
-	echo 'Enter path where raisimlib is installed, starting from "/home/..."; Example: /home/USER/raisimlib:'
+	echo 'Enter path where raisimLib is installed, starting from "/home/..."; Example: /home/USER/raisimLib:'
 	read raisim_path
 	RSG_PATH=$raisim_path'/raisimGymTorch'
-	
-	echo "Adding raisimGymTorch Path to .bashrc"
+	echo "Adding raisimGymTorch Path to ~/.bashrc"
 	echo '## raisimGymTorch Path' >> ~/.bashrc
 	echo "export RSG_PATH=$RSG_PATH" >> ~/.bashrc
 	source ~/.bashrc
