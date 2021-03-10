@@ -10,8 +10,6 @@ environment:
   num_envs: 96
   eval_every_n: 200
   num_threads: 30
-  normalize_ob: True
-  clip_action: False # either scale action to [-1, 1] or clip it
 
   reward:
     position:
@@ -29,6 +27,8 @@ architecture:
   value_net: [64, 64]
   activation_fn: nn.LeakyReLU
   deterministic_policy: False # True: does not converge.
+  normalize_ob: True
+  clip_action: False # either scale action to [-1, 1] or clip it
 
 
 hyperparam:

@@ -4,7 +4,7 @@ from raisimGymTorch.env.RaisimGymVecEnv import RaisimGymVecEnv as VecEnv
 from raisimGymTorch.algo.pid_controller.pid_controller import PID
 from raisimGymTorch.algo.imitation_learning.DAgger import DAgger
 from raisimGymTorch.helper.raisim_gym_helper import ConfigurationSaver, load_param, tensorboard_launcher
-from raisimGymTorch.helper.env_helper.env_helper import scale_action, normalize_observation
+from raisimGymTorch.helper.env_helper.env_helper import clip_action, normalize_observation
 import raisimGymTorch.algo.shared_modules.actor_critic as module
 import os
 import math
@@ -151,12 +151,13 @@ for update in range(1000):
             expert_obs = env.observe()
             learner_obs = expert_obs.copy()
             learner_obs -= target_point
-            learner_obs = normalize_observation(env, learner_obs, normalize_ob=cfg['environment']['normalize_ob'])
+            learner_obs = normalize_observation(env, learner_obs, normalize_ob=cfg['architecture']['normalize_ob'])
             learner_obs.resize((cfg['environment']['num_envs'], 18), refcheck=False)
 
             action_ll = loaded_graph.architecture(torch.from_numpy(learner_obs))
-
-            reward, dones = env.step(action_ll.cpu().detach().numpy())
+            action_ll = clip_action(action_ll, clip_action=cfg['architecture']['clip_action'])
+            
+            reward, dones = env.step(action_ll)
 
             time.sleep(cfg['environment']['control_dt'])
 
@@ -177,7 +178,7 @@ for update in range(1000):
         expert_obs = env.observe()
         learner_obs = expert_obs.copy()
         learner_obs -= target_point
-        learner_obs = normalize_observation(env, learner_obs, normalize_ob=cfg['environment']['normalize_ob'])
+        learner_obs = normalize_observation(env, learner_obs, normalize_ob=cfg['architecture']['normalize_ob'])
         learner_obs.resize((cfg['environment']['num_envs'], 18), refcheck=False)
 
         for i in range(0, len(expert_obs)):
@@ -186,8 +187,9 @@ for update in range(1000):
                                                   target=target_point[0:12].reshape((12, 1)), loopCount=loopCount)
 
         learner_actions = learner.observe(actor_obs=learner_obs, expert_actions=expert_actions)
-
-        reward, dones = env.step(learner_actions.cpu().detach().numpy())
+        learner_actions = clip_action(learner_actions, clip_action=cfg['architecture']['clip_action'])
+        
+        reward, dones = env.step(learner_actions)
         learner.step(obs=learner_obs, rews=reward, dones=dones)
 
         # for outter control loop running five times slower

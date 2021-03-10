@@ -1,23 +1,27 @@
 import torch
 import numpy as np
 
-# action scaling
-def scale_action(actions, clip_action=False):
+# action clipping instead of scaling
+def clip_action(actions,  clip_action=False):
     if clip_action:
         return np.clip(actions.cpu().detach().numpy(), -1, 1)
-        
     else:
-        for i in range(0, len(actions)):
-            min = torch.min(actions[i][:])
-            max = torch.max(actions[i][:])
+        return actions.cpu.detach().numpy
 
-            if torch.abs(min) > 1 or torch.abs(max) > 1:
-                if torch.abs(min) < torch.abs(max):
-                    actions[i][:] /= torch.abs(max)
-                else:
-                    actions[i][:] /= torch.abs(min)
 
-        return actions.cpu().detach().numpy()
+# action scaling
+def scale_action(actions):
+    for i in range(0, len(actions)):
+        min = torch.min(actions[i][:])
+        max = torch.max(actions[i][:])
+
+        if torch.abs(min) > 1 or torch.abs(max) > 1:
+            if torch.abs(min) < torch.abs(max):
+                actions[i][:] /= torch.abs(max)
+            else:
+                actions[i][:] /= torch.abs(min)
+
+    return actions.cpu().detach().numpy()
     
 
 # works as an environment wrapper, uses methods of env to normalize the observation and update the RMS.

@@ -3,7 +3,7 @@ from raisimGymTorch.env.bin import quadcopter_reinforcement
 from raisimGymTorch.algo.reinforcement_learning.ppo import PPO
 from raisimGymTorch.env.RaisimGymVecEnv import RaisimGymVecEnv as VecEnv
 from raisimGymTorch.helper.raisim_gym_helper import ConfigurationSaver, load_param, tensorboard_launcher
-from raisimGymTorch.helper.env_helper.env_helper import scale_action, normalize_observation
+from raisimGymTorch.helper.env_helper.env_helper import clip_action, normalize_observation
 import raisimGymTorch.algo.shared_modules.actor_critic as module
 import os
 import math
@@ -53,7 +53,7 @@ deterministic_policy = cfg['architecture']['deterministic_policy']
 
 # create environment from the configuration file
 env = VecEnv(quadcopter_reinforcement.RaisimGymEnv(home_path + "/../rsc", dump(cfg['environment'], Dumper=RoundTripDumper)),
-             cfg['environment'], normalize_ob=cfg['environment']['normalize_ob'])
+             cfg['environment'], normalize_ob=cfg['architecture']['normalize_ob'])
 
 # action and observation space. Learner has 4 values less (quaternions)
 ob_dim_expert = env.num_obs # expert has 4 additional values for quaternions
@@ -142,13 +142,10 @@ for update in range(1000):
         for step in range(int(n_steps*1.5)):
             full_obs = env.observe()
             obs = full_obs.copy()
-            obs = normalize_observation(env, obs, normalize_ob=cfg['environment']['normalize_ob'])
             obs.resize((cfg['environment']['num_envs'], 18), refcheck=False)
 
             action_ll = loaded_graph.architecture(torch.from_numpy(obs).cpu())
-            action_ll += 2
-
-            print(action_ll)
+            action_ll = clip_action(action_ll, cfg['architecture']['clip_action'])
 
             _, _ = env.step(action_ll.cpu().detach().numpy())
 
@@ -170,11 +167,10 @@ for update in range(1000):
 
         full_obs = env.observe()
         obs = full_obs.copy()
-        obs = normalize_observation(env, obs, normalize_ob=cfg['environment']['normalize_ob'])
         obs.resize((cfg['environment']['num_envs'], 18), refcheck=False)
 
         action = ppo.observe(obs)
-        action = scale_action(action, clip_action=cfg['environment']['clip_action'])
+        action = clip_action(action, clip_action=cfg['environment']['clip_action'])
 
         reward, dones = env.step(action)
 
@@ -187,7 +183,7 @@ for update in range(1000):
     # take st step to get value obs
     full_obs = env.observe()
     obs = full_obs.copy()
-    obs = normalize_observation(env, obs, normalize_ob=cfg['environment']['normalize_ob'])
+    obs = normalize_observation(env, obs, normalize_ob=cfg['architecture']['normalize_ob'])
     obs.resize((cfg['environment']['num_envs'], 18), refcheck=False)
 
     mean_loss = ppo.update(actor_obs=obs,
@@ -206,6 +202,7 @@ for update in range(1000):
     print('----------------------------------------------------')
     print('{:>6}th iteration'.format(update))
     print('{:<40} {:>6}'.format("average ll reward: ", '{:0.10f}'.format(average_ll_performance)))
+    print('{:<40} {:>6}'.format("total reward: ", '{:0.10f}'.format(reward_ll_sum)))
     print('{:<40} {:>6}'.format("dones: ", '{:0.6f}'.format(average_dones)))
     print('{:<40} {:>6}'.format("mean loss: ", '{:0.6f}'.format(mean_loss)))
     print('{:<40} {:>6}'.format("time elapsed in this iteration: ", '{:6.4f}'.format(end - start)))
