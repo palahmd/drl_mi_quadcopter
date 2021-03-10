@@ -49,6 +49,7 @@ public:
 
         /// initialize rotor thrusts_ and conversion matrix for generated forces and torques
         thrusts_.setZero(nRotors_);
+        controlThrusts_.setZero(nRotors_);
         thrusts2TorquesAndForces_ << 1, 1, 1, 1,
                 rotorPos_, -rotorPos_, -rotorPos_, rotorPos_,
                 -rotorPos_, -rotorPos_, rotorPos_, rotorPos_,
@@ -59,7 +60,11 @@ public:
         actionStd_.setConstant(0.5*hoverThrust_);
         targetPoint_ << 5.0, 5.0, 5.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
 
-        
+        /// indices of links that should not make contact with ground - all links and bodies
+        bodyIndices_.insert(robot_->getBodyIdx("rotor_0"));
+        bodyIndices_.insert(robot_->getBodyIdx("rotor_1"));
+        bodyIndices_.insert(robot_->getBodyIdx("rotor_2"));
+        bodyIndices_.insert(robot_->getBodyIdx("rotor_3"));
 
         /// Reward coefficients
         rewards_.initializeFromConfigurationFile (cfg["reward"]);
@@ -85,10 +90,35 @@ public:
     }
 
     float step(const Eigen::Ref<EigenVec> &action) final {
-        /// action scaling
-        thrusts_ = action.cast<double>();
-        thrusts_ = thrusts_.cwiseProduct(actionStd_);
-        thrusts_ = thrusts_ + actionMean_;
+        controlThrusts_ = action.cast<double>();
+
+        double max_scale = controlThrusts_.maxCoeff();
+        double min_scale = controlThrusts_.minCoeff();
+
+        /// scale action down to [-1, 1]. should work better than clipping, does at least for the pid controller
+        if ((max_scale > 1) || (min_scale < - 1)) {
+            if (std::abs(min_scale) < std::abs(max_scale)) {
+                controlThrusts_ /= max_scale;
+            }
+            else {
+                controlThrusts_ /= min_scale;
+            }
+        }
+
+        /// scale bounded action input to thrusts
+        controlThrusts_ = controlThrusts_.cwiseProduct(actionStd_);
+        controlThrusts_ += actionMean_;
+        thrusts_ = controlThrusts_;
+
+
+        /// apply simyple motor delay model
+        for (int i = 0; i<4; i++){
+            if (thrusts_[i]<controlThrusts_[i]) {  // time constant for increasing rotor speed
+                thrusts_[i] = thrusts_[i] + (controlThrusts_[i] - thrusts_[i]) * simulation_dt_ / 0.0125;
+            } else if (thrusts_[i]>controlThrusts_[i]){   // time constant for decreasing rotor speed
+                thrusts_[i] = thrusts_[i] + (controlThrusts_[i] - thrusts_[i]) * simulation_dt_ / 0.025;
+            }
+        }
 
         applyThrusts();
 
@@ -103,7 +133,7 @@ public:
 
         rewards_.record("position", std::sqrt((targetPoint_.head(3) - bodyPos_).squaredNorm()));
         rewards_.record("thrust", thrusts_.squaredNorm());
-        rewards_.record("orientation", std::abs(std::acos(bodyRot_(2,1))));
+        rewards_.record("orientation", std::acos(bodyRot_(2,1)));
         rewards_.record("angularVelocity", bodyAngVel_.squaredNorm());
 
         return rewards_.sum();
@@ -172,6 +202,20 @@ public:
     bool isTerminalState(float& terminalReward) final {
         terminalReward = float(terminalRewardCoeff_);
 
+        for(auto& contact: robot_->getContacts()) {
+            if (bodyIndices_.find(contact.getlocalBodyIndex()) == bodyIndices_.end())
+                return true;
+        }
+
+        if (gc_.mean() + gv_.mean() < 0.01){
+            terminalReward = 5.f;
+            return true;
+        }
+
+        if (gc_.head(3).mean() > 20){
+            return true;
+        }
+
         terminalReward = 0.f;
         return false;
     }
@@ -181,7 +225,7 @@ public:
     Eigen::Vector3d bodyPos_, bodyLinVel_, bodyAngVel_;
     Eigen::Matrix3d bodyRot_;
 
-    Eigen::VectorXd thrusts_;
+    Eigen::VectorXd thrusts_, controlThrusts_;
     Eigen::Matrix4d thrusts2TorquesAndForces_;
     Eigen::Vector4d torquesAndForces_;
     Eigen::Vector3d torques_baseFrame_, forces_baseFrame_;
@@ -199,12 +243,12 @@ public:
     bool visualizable_ = true;
     raisim::ArticulatedSystem* robot_;
     Eigen::VectorXd gc_init_, gv_init_, gc_, gv_;
-    double terminalRewardCoeff_ = -10.;
+    double terminalRewardCoeff_ = -5.;
     Eigen::VectorXd obDouble_, targetPoint_;
     Eigen::Vector4d actionMean_, actionStd_;
     std::set<size_t> baseIndex_;
     raisim::Reward rewards_;
-
+    std::set<size_t> bodyIndices_;
 };
 }
 

@@ -58,6 +58,7 @@ else:
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+    # TODO: Test if sampling over distribution works better
     print("Visualizing and evaluating the policy: ", weight_path)
     loaded_graph = module.MLP(cfg['architecture']['policy_net'], torch.nn.LeakyReLU, ob_dim_learner, act_dim)
     loaded_graph.load_state_dict(torch.load(weight_path)['actor_architecture_state_dict'])

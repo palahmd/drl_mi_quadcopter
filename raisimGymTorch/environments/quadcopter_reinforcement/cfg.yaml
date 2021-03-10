@@ -17,7 +17,7 @@ environment:
     position:
       coeff: -0.002
     thrust:
-      coeff: 0.0001
+      coeff: 0.001
     orientation:
       coeff: -0.002
     angularVelocity:
@@ -39,7 +39,7 @@ hyperparam:
   Lambda: 0.95
   learning_rate: 0.0005
   value_loss_coef: 0.5
-  use_clipped_value_loss: True
+  use_clipped_value_loss: False
   entropy_coef: 0.0
 
 

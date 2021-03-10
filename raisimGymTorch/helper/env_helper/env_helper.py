@@ -4,7 +4,7 @@ import numpy as np
 # action scaling
 def scale_action(actions, clip_action=False):
     if clip_action:
-        return np.clip(actions.numpy(), -1, 1)
+        return np.clip(actions.cpu().detach().numpy(), -1, 1)
         
     else:
         for i in range(0, len(actions)):
