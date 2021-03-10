@@ -130,10 +130,10 @@ public:
 
         updateObservation();
 
-        rewards_.record("position", std::sqrt((targetPoint_.head(3) - bodyPos_).squaredNorm()));
-        rewards_.record("thrust", thrusts_.squaredNorm());
+        rewards_.record("position", std::sqrt((targetPoint_.head(3) - bodyPos_).transpose() * (targetPoint_.head(3) - bodyPos_)));
+        rewards_.record("thrust", thrusts_.mean());
         rewards_.record("orientation", std::abs(std::acos(bodyRot_(2,1))));
-        rewards_.record("angularVelocity", bodyAngVel_.squaredNorm());
+        rewards_.record("angularVelocity", std::abs(bodyAngVel_.mean()));
 
         return rewards_.sum();
     }
@@ -217,6 +217,16 @@ public:
                 return true;
         }
 
+        if (std::sqrt(gc_.squaredNorm() + gv_.squaredNorm()) < 0.01){
+            terminalReward = 5.f;
+            return true;
+        }
+
+        if (gc_.mean() > 20){
+            return false;
+        }
+
+
         terminalReward = 0.f;
         return false;
     }
@@ -257,7 +267,7 @@ private:
 
     /// reward parameters
     raisim::Reward rewards_;
-    double terminalRewardCoeff_ = -1.;
+    double terminalRewardCoeff_ = -5.;
     std::set<size_t> bodyIndices_;
 
 };

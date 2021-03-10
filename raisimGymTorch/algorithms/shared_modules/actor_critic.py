@@ -26,8 +26,9 @@ class Actor:
     def parameters(self):
         return [*self.architecture.parameters(), *self.distribution.parameters()]
 
+    # TODO: try cpu().detach()
     def noiseless_action(self, obs):
-        return self.architecture.architecture(torch.from_numpy(obs).to(self.device))
+        return self.architecture.architecture(obs).cpu().detach()
 
     def save_deterministic_graph(self, file_name, example_input, device='cpu'):
         transferred_graph = torch.jit.trace(self.architecture.architecture.to(device), example_input)
@@ -115,6 +116,7 @@ class MultivariateGaussianDiagonalCovariance(nn.Module):
         actions_log_prob = distribution.log_prob(outputs).sum(dim=1)
         entropy = distribution.entropy().sum(dim=1)
 
+        # TODO: return action_mean/input
         return actions_log_prob, entropy
 
     def entropy(self):

@@ -115,7 +115,7 @@ for update in range(1000):
 
     # skip first visualization: update =! 0
     if update == 0:
-        update = 1
+        update = 0
 
     if update % cfg['environment']['eval_every_n'] == 0:
         print("Visualizing and evaluating the current policy")
@@ -136,7 +136,7 @@ for update in range(1000):
         env.turn_on_visualization()
         env.reset()
         time.sleep(2)
-        #env.start_video_recording(datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S") + "policy_"+str(update)+'.mp4')
+        env.start_video_recording(datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S") + "policy_"+str(update)+'.mp4')
         time.sleep(2)
 
         for step in range(int(n_steps*1.5)):
@@ -146,13 +146,15 @@ for update in range(1000):
             obs.resize((cfg['environment']['num_envs'], 18), refcheck=False)
 
             action_ll = loaded_graph.architecture(torch.from_numpy(obs).cpu())
-            action_ll = scale_action(action_ll, clip_action=cfg['environment']['clip_action'])
+            action_ll += 2
 
-            reward_ll, dones = env.step(action_ll)
+            print(action_ll)
+
+            _, _ = env.step(action_ll.cpu().detach().numpy())
 
             time.sleep(cfg['environment']['control_dt'])
 
-        #env.stop_video_recording()
+        env.stop_video_recording()
         env.turn_off_visualization()
 
         # close raisimUnity to use less resources
@@ -164,7 +166,7 @@ for update in range(1000):
 
     # actual training
     for step in range(n_steps):
-        env.turn_on_visualization()
+        #env.turn_on_visualization()
 
         full_obs = env.observe()
         obs = full_obs.copy()
@@ -180,7 +182,7 @@ for update in range(1000):
         done_sum = done_sum + sum(dones)
         reward_ll_sum = reward_ll_sum + sum(reward)
 
-        env.turn_on_visualization()
+        #env.turn_on_visualization()
 
     # take st step to get value obs
     full_obs = env.observe()

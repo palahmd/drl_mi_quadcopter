@@ -53,12 +53,12 @@ class PID:
         self.controlThrusts = self.thrusts2TorquesAndForcesInv.dot(self.u)
 
         # action scaling within the boundaries of 0.5 * hoverThrust < thrust < 1.5 * hoverThrust
-        max_scale = np.max(self.controlThrusts)
-        if max_scale > 1.5 * self.hoverThrust:
-            self.controlThrusts = 1.5 / max_scale * self.hoverThrust * self.controlThrusts
-        for i in range(len(self.controlThrusts)):
-            if self.controlThrusts[i] < 0.5 * self.hoverThrust:
-                self.controlThrusts[i] = 0.5 * self.hoverThrust
+        #max_scale = np.max(self.controlThrusts)
+        #if max_scale > 1.5 * self.hoverThrust:
+        #    self.controlThrusts = 1.5 / max_scale * self.hoverThrust * self.controlThrusts
+        #for i in range(len(self.controlThrusts)):
+        #    if self.controlThrusts[i] < 0.5 * self.hoverThrust:
+        #        self.controlThrusts[i] = 0.5 * self.hoverThrust
 
         if self.normalize_action:
             self.controlThrusts = self.controlThrusts / (0.5*self.hoverThrust) - 2

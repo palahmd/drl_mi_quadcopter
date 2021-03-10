@@ -73,7 +73,7 @@ class PPO:
         self.actor_obs = actor_obs
 
         if self.deterministic_policy:
-            self.actions = self.actor.noiseless_action(actor_obs)
+            self.actions = self.actor.noiseless_action(torch.from_numpy(actor_obs).to(self.device))
         else:
             self.actions, self.actions_log_prob = self.actor.sample(torch.from_numpy(actor_obs).to(self.device))
         # self.actions = np.clip(self.actions.numpy(), self.env.action_space.low, self.env.action_space.high)
@@ -128,8 +128,8 @@ class PPO:
 
                 # Surrogate loss
                 if self.deterministic_policy:
-                    new_actions_batch = self.actor.self.actor.architecture.architecture(actor_obs_batch)
-                    ratio = new_actions_batch / torch.squeeze(actions_batch)
+                    new_actions_batch = self.actor.noiseless_action(actor_obs_batch)
+                    ratio = torch.mean(new_actions_batch, dim=1) / torch.mean(actions_batch, dim=1)
                 else:
                     ratio = torch.exp(actions_log_prob_batch - torch.squeeze(old_actions_log_prob_batch))
 

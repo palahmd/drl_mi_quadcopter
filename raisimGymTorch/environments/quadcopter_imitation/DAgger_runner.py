@@ -1,5 +1,5 @@
 from ruamel.yaml import YAML, dump, RoundTripDumper
-from raisimGymTorch.env.bin import rsg_quadcopter_imitation
+from raisimGymTorch.env.bin import quadcopter_imitation
 from raisimGymTorch.env.RaisimGymVecEnv import RaisimGymVecEnv as VecEnv
 from raisimGymTorch.algo.pid_controller.pid_controller import PID
 from raisimGymTorch.algo.imitation_learning.DAgger import DAgger
@@ -43,14 +43,14 @@ raisim_unity_Path = home_path + "/raisimUnity/raisimUnity.x86_64"
 # logging
 saver = ConfigurationSaver(log_dir=home_path + "/training/imitation",
                            save_items=[task_path + "/cfg.yaml", task_path + "/Environment.hpp"])
-#tensorboard_launcher(saver.data_dir+"/..")  # press refresh (F5) after the first ppo update
+tensorboard_launcher(saver.data_dir+"/..")  # press refresh (F5) after the first ppo update
 
 # config and config related options
 cfg = YAML().load(open(task_path + "/cfg.yaml", 'r'))
 
 
 # create environment from the configuration file
-env = VecEnv(rsg_quadcopter_imitation.RaisimGymEnv(home_path + "/../rsc", dump(cfg['environment'], Dumper=RoundTripDumper)),
+env = VecEnv(quadcopter_imitation.RaisimGymEnv(home_path + "/../rsc", dump(cfg['environment'], Dumper=RoundTripDumper)),
              cfg['environment'], normalize_ob=False)
 
 # observation and action dim
@@ -68,8 +68,8 @@ expert = PID(2.5, 20, 6.3, ob_dim_expert, act_dim, cfg['environment']['control_d
 expert_actions = np.zeros(shape=(cfg['environment']['num_envs'], act_dim), dtype="float32")
 
 target_point = np.array([5.0, 5.0, 5.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                         0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], dtype="float32")
-target_point_n_envs = np.zeros(shape=(cfg['environment']['num_envs'], ob_dim_expert), dtype="float32")
+                         0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], dtype=float)
+target_point_n_envs = np.zeros(shape=(cfg['environment']['num_envs'], ob_dim_expert), dtype=float)
 for i in range (0, cfg['environment']['num_envs']):
     target_point_n_envs[i, :] = target_point
 
@@ -120,7 +120,7 @@ for update in range(1000):
     loopCount = 5
 
     if update == 0:
-        update =1
+        update = 1
 
     """ Evaluation and saving of the models """
     if update % cfg['environment']['eval_every_n'] == 0:
@@ -154,11 +154,9 @@ for update in range(1000):
             learner_obs = normalize_observation(env, learner_obs, normalize_ob=cfg['environment']['normalize_ob'])
             learner_obs.resize((cfg['environment']['num_envs'], 18), refcheck=False)
 
-            action_ll = loaded_graph.architecture(torch.from_numpy(learner_obs).cpu())
-            action_ll = scale_action(action_ll, clip_action=cfg['environment']['clip_action'])
+            action_ll = loaded_graph.architecture(torch.from_numpy(learner_obs))
 
-
-            _, _ = env.step(action_ll)
+            reward, dones = env.step(action_ll.cpu().detach().numpy())
 
             time.sleep(cfg['environment']['control_dt'])
 
@@ -174,8 +172,7 @@ for update in range(1000):
 
     """ Atual training """
     for step in range(n_steps):
-#        env.turn_on_visualization()
-
+        env.turn_on_visualization()
         # separate and expert obs with dim 22 and (normalized) learner obs with dim 18
         expert_obs = env.observe()
         learner_obs = expert_obs.copy()
@@ -184,26 +181,21 @@ for update in range(1000):
         learner_obs.resize((cfg['environment']['num_envs'], 18), refcheck=False)
 
         for i in range(0, len(expert_obs)):
-            expert_obs_env_i = expert_obs[i, :].copy()
+            expert_obs_env_i = expert_obs[i, :]
             expert_actions[i, :] = expert.control(obs=expert_obs_env_i.reshape((22, 1)),
                                                   target=target_point[0:12].reshape((12, 1)), loopCount=loopCount)
 
-
         learner_actions = learner.observe(actor_obs=learner_obs, expert_actions=expert_actions)
 
-        reward, dones = env.step(learner_actions)
+        reward, dones = env.step(learner_actions.cpu().detach().numpy())
         learner.step(obs=learner_obs, rews=reward, dones=dones)
 
-        # for outter control loop
+        # for outter control loop running five times slower
         if loopCount == 5:
             loopCount = 0
         loopCount += 1
-#        env.turn_off_visualization()
 
-        #frame_end = time.time()
-        #wait_time = cfg['environment']['control_dt'] - (frame_end - frame_start)
-        #if wait_time > 0.:
-         #   time.sleep(wait_time)
+        env.turn_off_visualization()
 
     mean_loss, mean_action_loss, mean_action_log_prob_loss = learner.update(log_this_iteration=update % 10 == 0, 
                                                                             update=update)

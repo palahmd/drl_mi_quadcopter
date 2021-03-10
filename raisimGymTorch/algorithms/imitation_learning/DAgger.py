@@ -76,7 +76,7 @@ class DAgger:
         self.expert_actions = torch.from_numpy(expert_actions).to(self.device)
 
         if self.deterministic_policy:
-            self.learner_actions = self.actor.noiseless_action(actor_obs)
+            self.learner_actions = self.actor.noiseless_action(torch.from_numpy(actor_obs).to(self.device))
         else:
             self.learner_actions, self.learner_actions_log_prob = self.actor.sample(torch.from_numpy(actor_obs).to(self.device))
 
@@ -87,9 +87,9 @@ class DAgger:
             if self.expert_chosen[i][0]:
                 self.actions[i][:] = self.expert_actions[i][:].to(self.device)
             else:
-                self.actions[i][:] = self.normalize_action_per_env(self.learner_actions[i][:]).to(self.device)
+                self.actions[i][:] = self.learner_actions[i][:]
 
-        return self.actions.cpu().detach().numpy()
+        return self.actions
 
     def step(self, obs, rews, dones):
         values = self.critic.predict(torch.from_numpy(obs).to(self.device))
@@ -183,8 +183,9 @@ class DAgger:
                 advantages_batch, returns_batch, old_actions_log_prob_batch \
                     in self.batch_sampler(self.num_mini_batches):
 
+                # TODO: output acion mean with actor.evaluate
                 act_log_prob_batch, entropy_batch = self.actor.evaluate(actor_obs_batch, expert_actions_batch)
-                new_actions_batch = self.actor.architecture.architecture(actor_obs_batch)
+                new_actions_batch = self.actor.noiseless_action(actor_obs_batch).to(self.device)
 
                 l2_reg = [torch.sum(torch.square(w)) for w in self.actor.parameters() and self.critic.parameters()]
                 l2_reg_norm = sum(l2_reg) / 2
@@ -196,6 +197,7 @@ class DAgger:
                 l2_reg_loss = self.l2_reg_weight * l2_reg_norm
 
                 if self.log_prob_loss:
+                    act_log_prob_batch, entropy_batch = self.actor.evaluate(actor_obs_batch, expert_actions_batch)
                     loss = action_log_prob_loss + entropy_loss + l2_reg_loss
                 else:
                     loss = action_loss + entropy_loss + l2_reg_loss

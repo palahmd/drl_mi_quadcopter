@@ -8,14 +8,14 @@ environment:
   render: True
 
   num_envs: 96
-  eval_every_n: 20
+  eval_every_n: 200
   num_threads: 30
   normalize_ob: True
   clip_action: False # either scale action to [-1, 1] or clip it
 
   reward:
     position:
-      coeff: -0.002
+      coeff: 0.002
     thrust:
       coeff: 0.0001
     orientation:
@@ -28,18 +28,18 @@ architecture:
   policy_net: [64, 64]
   value_net: [64, 64]
   activation_fn: nn.LeakyReLU
-  deterministic_policy: True
+  deterministic_policy: False # True: does not converge.
 
 
 hyperparam:
   num_mini_batches: 8
   num_learning_epochs: 4
-  shuffle: False
+  shuffle: True
   Gamma: 0.99
   Beta: 0.8
   beta_scheduler: 0.0005
   learning_rate: 0.0005
   l2_reg_weight: 0.0
   entropy_weight: 0.0
-  log_prob_loss: False
+  log_prob_loss: True
 
