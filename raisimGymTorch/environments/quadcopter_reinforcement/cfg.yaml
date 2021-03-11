@@ -39,7 +39,7 @@ hyperparam:
   Lambda: 0.95
   learning_rate: 0.0005
   value_loss_coef: 0.5
-  use_clipped_value_loss: False
+  use_clipped_value_loss: True # if True: PPO2, False: PPO
   entropy_coef: 0.0
 
 

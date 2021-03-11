@@ -6,7 +6,7 @@ def clip_action(actions,  clip_action=False):
     if clip_action:
         return np.clip(actions.cpu().detach().numpy(), -1, 1)
     else:
-        return actions.cpu.detach().numpy
+        return actions.cpu().detach().numpy()
 
 
 # action scaling
