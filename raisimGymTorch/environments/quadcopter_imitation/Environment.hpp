@@ -45,7 +45,7 @@ public:
 
         /// nominal configuration of quadcopter: [0]-[2]: center of mass, [3]-[6]: quanternions, [7]-[10]: rotors
         gc_init_ << 0.0, 0.0, 0.135, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
-        gv_init_ << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -400 * rpm_, 400 * rpm_, -400 * rpm_, 400 * rpm_;
+        gv_init_ << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1000 * rpm_, 1000 * rpm_, -1000 * rpm_, 1000 * rpm_;
 
         /// initialize rotor thrusts_ and conversion matrix for generated forces and torques
         thrusts_.setZero(nRotors_);
@@ -84,9 +84,7 @@ public:
     void reset() final {
         robot_->setState(gc_init_, gv_init_);
         updateObservation();
-        if (visualizable_) {
-            server_->focusOn(robot_);
-        }
+        if (visualizable_) server_->focusOn(robot_);
     }
 
     float step(const Eigen::Ref<EigenVec> &action) final {
@@ -126,6 +124,7 @@ public:
         for (int i = 0; i < int(control_dt_ / simulation_dt_ + 1e-10); i++) {
             if (server_) server_->lockVisualizationServerMutex();
             world_->integrate();
+            if (visualizable_) raisim::MSLEEP(simulation_dt_);
             if (server_) server_->unlockVisualizationServerMutex();
         }
 
@@ -207,12 +206,7 @@ public:
                 return true;
         }
 
-        if (gc_.mean() + gv_.mean() < 0.01){
-            terminalReward = 5.f;
-            return true;
-        }
-
-        if (gc_.head(3).mean() > 20){
+        if (std::abs((gc_.head(3)).mean()) > 30){
             return true;
         }
 

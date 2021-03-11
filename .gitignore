@@ -38,6 +38,8 @@ raisimGymTorch/raisim_gym_torch.egg-info
 raisim/cmake-build-debug/
 .idea/
 raisimGymTorch/data
+raisimGymTorch/training
+raisimGymTorch/raisimUnity
 
 # other files
 rsc/activation.raisim

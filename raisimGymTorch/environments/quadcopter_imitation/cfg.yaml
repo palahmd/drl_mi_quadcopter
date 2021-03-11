@@ -2,14 +2,14 @@ seed: 1
 record_video: yes
 
 environment:
-  simulation_dt: 0.0025
+  simulation_dt: 0.0005
   control_dt: 0.01
   max_time: 11.0
   render: True
 
-  num_envs: 96
-  eval_every_n: 200
-  num_threads: 30
+  num_envs: 80
+  eval_every_n: 20
+  num_threads: 20
 
   reward:
     position:
@@ -26,14 +26,14 @@ architecture:
   policy_net: [64, 64]
   value_net: [64, 64]
   activation_fn: nn.LeakyReLU
-  deterministic_policy: False # True: does not converge.
+  deterministic_policy: False # True: does not converge because action_loss will be used then
   normalize_ob: True
-  clip_action: False # either scale action to [-1, 1] or clip it
+  clip_action: False # either scale or clip action to [-1, 1]
 
 
 hyperparam:
-  num_mini_batches: 8
-  num_learning_epochs: 4
+  num_mini_batches: 4
+  num_learning_epochs: 6
   shuffle: True
   Gamma: 0.99
   Beta: 0.8

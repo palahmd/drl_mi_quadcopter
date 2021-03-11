@@ -35,6 +35,7 @@ weight_path = args.weight
 # check if gpu is available
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+
 # directories
 task_path = os.path.dirname(os.path.realpath(__file__))
 home_path = task_path + "/../.."
@@ -43,7 +44,7 @@ raisim_unity_Path = home_path + "/raisimUnity/raisimUnity.x86_64"
 # logging
 saver = ConfigurationSaver(log_dir=home_path + "/training/imitation",
                            save_items=[task_path + "/cfg.yaml", task_path + "/Environment.hpp"])
-tensorboard_launcher(saver.data_dir+"/..")  # press refresh (F5) after the first ppo update
+#tensorboard_launcher(saver.data_dir+"/..")  # press refresh (F5) after the first ppo update
 
 # config and config related options
 cfg = YAML().load(open(task_path + "/cfg.yaml", 'r'))
@@ -105,20 +106,24 @@ learner = DAgger(actor=actor, critic=critic, act_dim=act_dim,
 
 if mode == 'retrain':
     load_param(weight_path, env, actor, critic, learner.optimizer, saver.data_dir)
-
+    last_update = int(weight_path.rsplit('/', 1)[1].split('_', 1)[1].rsplit('.', 1)[0])
+else:
+    last_update = 0
 
 """ 
 Training Loop
 """
 
 
-for update in range(1000):
+for update in range(10000):
     env.reset()
     start = time.time()
 
     # tmeps
     loopCount = 5
 
+    # optional: skip first visualization with update = 1
+    update += last_update
     if update == 0:
         update = 1
 
@@ -131,6 +136,7 @@ for update in range(1000):
             'critic_architecture_state_dict': critic.architecture.state_dict(),
             'optimizer_state_dict': learner.optimizer.state_dict(),
         }, saver.data_dir+"/full_"+str(update)+'.pt')
+        env.save_scaling(saver.data_dir, str(update))
 
         # we create another graph just to demonstrate the save/load method
         loaded_graph = module.MLP(cfg['architecture']['policy_net'], eval(cfg['architecture']['activation_fn']), ob_dim_learner, act_dim)
@@ -138,12 +144,12 @@ for update in range(1000):
 
         # open raisimUnity and wait until it has started and focused on robot
         proc = subprocess.Popen(raisim_unity_Path)
-        time.sleep(5)
+        time.sleep(10)
         env.turn_on_visualization()
         env.reset()
-        time.sleep(2)
+        time.sleep(6)
         env.start_video_recording(datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S") + "policy_"+str(update)+'.mp4')
-        time.sleep(2)
+        time.sleep(3)
 
         for step in range(int(n_steps*1.5)):
 
@@ -165,15 +171,15 @@ for update in range(1000):
         env.turn_off_visualization()
 
         # close raisimUnity to use less ressources
-        os.kill(proc.pid+1, signal.SIGKILL)
+        proc.kill()
+        #os.kill(proc.pid+1, signal.SIGKILL) # if proc.kill() does not work
 
         env.reset()
-        env.save_scaling(saver.data_dir, str(update))
 
 
     """ Atual training """
     for step in range(n_steps):
-        env.turn_on_visualization()
+        #env.turn_on_visualization()
         # separate and expert obs with dim 22 and (normalized) learner obs with dim 18
         expert_obs = env.observe()
         learner_obs = expert_obs.copy()
@@ -197,7 +203,7 @@ for update in range(1000):
             loopCount = 0
         loopCount += 1
 
-        env.turn_off_visualization()
+        #env.turn_off_visualization()
 
     mean_loss, mean_action_loss, mean_action_log_prob_loss = learner.update(log_this_iteration=update % 10 == 0, 
                                                                             update=update)

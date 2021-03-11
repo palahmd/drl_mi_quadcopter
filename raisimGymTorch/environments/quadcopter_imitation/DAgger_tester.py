@@ -1,9 +1,9 @@
 from ruamel.yaml import YAML, dump, RoundTripDumper
-from raisimGymTorch.env.bin import rsg_quadcopter_imitation
+from raisimGymTorch.env.bin import quadcopter_imitation
 from raisimGymTorch.env.RaisimGymVecEnv import RaisimGymVecEnv as VecEnv
-import raisimGymTorch.algo.imitation.module as module
-from raisimGymTorch.algo.imitation.DAgger import DAgger
-from raisimGymTorch.helper.env_helper.env_helper import normalize_action, normalize_observation
+import raisimGymTorch.algo.shared_modules.actor_critic as module
+from raisimGymTorch.algo.imitation_learning.DAgger import DAgger
+from raisimGymTorch.helper.env_helper.env_helper import scale_action, normalize_observation
 import os
 import math
 import time
@@ -28,14 +28,14 @@ cfg = YAML().load(open(task_path + "/cfg.yaml", 'r'))
 # create environment from the configuration file
 cfg['environment']['num_envs'] = 1
 
-env = VecEnv(rsg_quadcopter_imitation.RaisimGymEnv(home_path + "/rsc", dump(cfg['environment'],
+env = VecEnv(quadcopter_imitation.RaisimGymEnv(home_path + "/rsc", dump(cfg['environment'],
                                                                             Dumper=RoundTripDumper)), cfg['environment'])
 
 # shortcuts
 ob_dim_expert = env.num_obs
 ob_dim_learner = ob_dim_expert - 4
 act_dim = env.num_acts
-target_point = np.array([10.0, 10.0, 10.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+target_point = np.array([5.0, 5.0, 5.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
                          0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], dtype="float32")
 
 weight_path = args.weight
