@@ -87,9 +87,9 @@ class DAgger:
             if self.expert_chosen[i][0]:
                 self.actions[i][:] = self.expert_actions[i][:].to(self.device)
             else:
-                self.actions[i][:] = self.learner_actions[i][:]
+                self.actions[i][:] = self.normalize_action_per_env(self.learner_actions[i][:]).to(self.device)
 
-        return self.actions
+        return self.actions.cpu().detach().numpy()
 
     def step(self, obs, rews, dones):
         values = self.critic.predict(torch.from_numpy(obs).to(self.device))

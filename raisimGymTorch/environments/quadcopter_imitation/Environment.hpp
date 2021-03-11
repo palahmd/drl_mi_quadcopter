@@ -89,7 +89,8 @@ public:
 
     float step(const Eigen::Ref<EigenVec> &action) final {
         controlThrusts_ = action.cast<double>();
-
+	
+	/*
         double max_scale = controlThrusts_.maxCoeff();
         double min_scale = controlThrusts_.minCoeff();
 
@@ -101,22 +102,22 @@ public:
             else {
                 controlThrusts_ /= min_scale;
             }
-        }
+        }*/
 
         /// scale bounded action input to thrusts
         controlThrusts_ = controlThrusts_.cwiseProduct(actionStd_);
         controlThrusts_ += actionMean_;
         thrusts_ = controlThrusts_;
 
-
-        /// apply simyple motor delay model
+        /*
+        /// apply simple motor delay model
         for (int i = 0; i<4; i++){
             if (thrusts_[i]<controlThrusts_[i]) {  // time constant for increasing rotor speed
                 thrusts_[i] = thrusts_[i] + (controlThrusts_[i] - thrusts_[i]) * simulation_dt_ / 0.0125;
             } else if (thrusts_[i]>controlThrusts_[i]){   // time constant for decreasing rotor speed
                 thrusts_[i] = thrusts_[i] + (controlThrusts_[i] - thrusts_[i]) * simulation_dt_ / 0.025;
             }
-        }
+        }*/
 
         applyThrusts();
 
@@ -124,7 +125,6 @@ public:
         for (int i = 0; i < int(control_dt_ / simulation_dt_ + 1e-10); i++) {
             if (server_) server_->lockVisualizationServerMutex();
             world_->integrate();
-            if (visualizable_) raisim::MSLEEP(simulation_dt_);
             if (server_) server_->unlockVisualizationServerMutex();
         }
 

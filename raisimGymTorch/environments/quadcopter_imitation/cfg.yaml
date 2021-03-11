@@ -7,7 +7,7 @@ environment:
   max_time: 11.0
   render: True
 
-  num_envs: 80
+  num_envs: 96
   eval_every_n: 20
   num_threads: 20
 
@@ -26,20 +26,23 @@ architecture:
   policy_net: [64, 64]
   value_net: [64, 64]
   activation_fn: nn.LeakyReLU
-  deterministic_policy: False # True: does not converge because action_loss will be used then
-  normalize_ob: True
-  clip_action: False # either scale or clip action to [-1, 1]
+  deterministic_policy: False # if True: does not converge, because action loss will be used instead of log prob action loss
+
+helper:
+  normalize_ob: False
+  update_mean: True
+  clip_action: False # either scale or clip action to [-1, 1]. Also works fine.
 
 
 hyperparam:
-  num_mini_batches: 4
+  num_mini_batches: 8
   num_learning_epochs: 6
-  shuffle: True
+  shuffle: True # True should give better sample efficiency
   Gamma: 0.99
   Beta: 0.8
   beta_scheduler: 0.0005
   learning_rate: 0.0005
-  l2_reg_weight: 0.0
+  l2_reg_weight: 0.005
   entropy_weight: 0.0
-  log_prob_loss: True
+  log_prob_loss: True # if True: best performance
 
