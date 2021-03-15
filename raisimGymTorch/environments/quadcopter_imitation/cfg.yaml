@@ -2,14 +2,15 @@ seed: 1
 record_video: yes
 
 environment:
-  simulation_dt: 0.0005
+  simulation_dt: 0.001
   control_dt: 0.01
   max_time: 11.0
   render: True
 
   num_envs: 96
   eval_every_n: 20
-  num_threads: 20
+  visualize_eval: True
+  num_threads: 24
 
   reward:
     position:
@@ -31,16 +32,18 @@ architecture:
 helper:
   normalize_ob: False
   update_mean: True
+  scale_action: False # because scaling is done in Environment.hpp for better performance
   clip_action: False # either scale or clip action to [-1, 1]. Also works fine.
 
 
 hyperparam:
   num_mini_batches: 8
-  num_learning_epochs: 6
+  num_learning_epochs: 8
   shuffle: True # True should give better sample efficiency
   Gamma: 0.99
-  Beta: 0.8
-  beta_scheduler: 0.0005
+  init_beta: 1
+  Beta: 0.4
+  beta_scheduler: 0.001
   learning_rate: 0.0005
   l2_reg_weight: 0.005
   entropy_weight: 0.0

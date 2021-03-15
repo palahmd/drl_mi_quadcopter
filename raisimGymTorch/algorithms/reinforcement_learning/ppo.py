@@ -72,7 +72,7 @@ class PPO:
     def observe(self, actor_obs):
         self.actor_obs = actor_obs
 
-        if self.deterministic_policy:
+        if not self.deterministic_policy:
             self.actions = self.actor.noiseless_action(torch.from_numpy(actor_obs).to(self.device))
         else:
             self.actions, self.actions_log_prob = self.actor.sample(torch.from_numpy(actor_obs).to(self.device))

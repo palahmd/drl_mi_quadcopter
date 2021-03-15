@@ -2,22 +2,21 @@ seed: 1
 record_video: yes
 
 environment:
-  simulation_dt: 0.0025
+  simulation_dt: 0.001
   control_dt: 0.01
-  max_time: 11.0
+  max_time: 15.0
   render: True
 
   num_envs: 96
-  eval_every_n: 20
+  eval_every_n: 50
+  visualize_eval: True
   num_threads: 30
-  normalize_ob: True
-  clip_action: False
 
   reward:
     position:
-      coeff: -0.002
+      coeff: -0.02
     thrust:
-      coeff: 0.001
+      coeff: 0.1
     orientation:
       coeff: -0.002
     angularVelocity:
@@ -30,6 +29,11 @@ architecture:
   activation_fn: nn.LeakyReLU
   deterministic_policy: False
 
+helper:
+  normalize_ob: False
+  update_mean: True
+  scale_action: False # because scaling is done in Environment.hpp for better performance
+  clip_action: False # either scale or clip action to [-1, 1]. Also works fine.
 
 hyperparam:
   num_mini_batches: 4
@@ -38,8 +42,8 @@ hyperparam:
   Gamma: 0.99
   Lambda: 0.95
   learning_rate: 0.0005
-  value_loss_coef: 0.5
-  use_clipped_value_loss: True # if True: PPO2, False: PPO
+  value_loss_coef: 1
+  use_clipped_value_loss: False # if True: PPO2, False: PPO
   entropy_coef: 0.0
 
 
