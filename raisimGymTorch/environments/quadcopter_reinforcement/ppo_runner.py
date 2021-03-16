@@ -58,7 +58,7 @@ env = VecEnv(quadcopter_reinforcement.RaisimGymEnv(home_path + "/../rsc", dump(c
 
 # action and observation space. Learner has 4 values less (quaternions)
 ob_dim_expert = env.num_obs # expert has 4 additional values for quaternions
-ob_dim_learner = ob_dim_expert - 4
+ob_dim_learner = ob_dim_expert - 3
 act_dim = env.num_acts
 obs = np.zeros((env.num_envs, ob_dim_learner), dtype="float32")
 
@@ -199,6 +199,8 @@ for update in range(1000):
     for i in range(0, env.num_envs):
         obs[i] = full_obs[i][0:18].copy()
     obs = helper.normalize_observation(obs)
+
+    print(obs)
 
     mean_loss = ppo.update(actor_obs=obs,
                value_obs=obs,

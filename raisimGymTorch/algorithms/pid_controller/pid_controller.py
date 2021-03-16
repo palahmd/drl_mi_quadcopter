@@ -5,7 +5,7 @@ from scipy.spatial.transform import Rotation as R
 ## PID Controller, only tuned for recent quadcopter model
 
 class PID:
-    def __init__(self, pGain, iGain, dGain, obs_dim, act_dim, timeStep, mass, normalize_action=False):
+    def __init__(self, pGain, iGain, dGain, obs_dim, act_dim, timeStep, mass, normalize_action=True):
         self.pGain = pGain
         self.iGain = iGain
         self.dGain = dGain
@@ -25,8 +25,9 @@ class PID:
 
     def control(self, obs, target, loopCount):
 
-        # eulerAngles = np.array(R.from_matrix(obs[3:12].reshape(3, 3)).as_rotvec()).reshape(3, 1) # does not work
+        #eulerAngles = np.array(R.from_matrix(obs[3:12].reshape(3, 3)).as_rotvec()).reshape(3, 1) # does not work
         eulerAngles = self.quatToEuler(obs[18:22])
+        #eulerAngles = obs[18:21]
         currState = np.concatenate([obs[0:3], eulerAngles, obs[12:18]])
         desState = np.zeros(shape=(12, 1))
         errState = target - currState

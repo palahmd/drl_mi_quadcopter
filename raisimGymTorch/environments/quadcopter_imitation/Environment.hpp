@@ -8,7 +8,8 @@
 #include <cstdint>
 #include <set>
 #include "../../RaisimGymEnv.hpp"
-
+#include <cmath>
+#include "Eigen/Dense"
 
 namespace raisim {
 
@@ -81,16 +82,22 @@ public:
     void init() final {}
 
     void reset() final {
-        robot_->setState(gc_init_, gv_init_);
-
         /// set random target point
-        if (loopCount_ = 0){
-            targetPoint_[0] = generateRandomValue(-5, 5);
-            targetPoint_[1] = generateRandomValue(-5, 5);
-            targetPoint_[2] = generateRandomValue(2, 5);
+        if (loopCount_ == 0){
+            double spawnChance = generateRandomValue(0,1);
+            if (spawnChance > 0.5){
+                gc_init_[2] = 0.135;
+            }
+            else{
+                gc_init_[2] = 10.135;
+            }
+            targetPoint_[0] = generateRandomValue(-10, 10);
+            targetPoint_[1] = generateRandomValue(-10, 10);
+            targetPoint_[2] = generateRandomValue(2.5, 7.5);
         }
         loopCount_++;
-        if (loopCount_ == 5) loopCount_ = 0;
+        if (loopCount_ == 8) loopCount_ = 0;
+        robot_->setState(gc_init_, gv_init_);
 
         if (visualizable_){
             server_->focusOn(robot_);
@@ -114,6 +121,7 @@ public:
                 controlThrusts_ /= min_scale;
             }
         }
+        normedControlThrusts_ = controlThrusts_;
 
         /// scale bounded action input to thrusts
         controlThrusts_ = controlThrusts_.cwiseProduct(actionStd_);
@@ -141,10 +149,10 @@ public:
 
         updateObservation();
 
-        rewards_.record("position", std::sqrt((targetPoint_.head(3) - bodyPos_).squaredNorm()));
-        rewards_.record("thrust", thrusts_.squaredNorm());
-        rewards_.record("orientation", std::acos(bodyRot_(2,1)));
-        rewards_.record("angularVelocity", bodyAngVel_.squaredNorm());
+        rewards_.record("position", std::sqrt((targetPoint_.head(3) - bodyPos_).transpose() * (targetPoint_.head(3) - bodyPos_)));
+        rewards_.record("thrust", normedControlThrusts_.mean());
+        rewards_.record("orientation", std::abs(eulerAngles_(2)));
+        rewards_.record("angularVelocity", std::abs(bodyAngVel_.mean()));
 
         return rewards_.sum();
     }
@@ -182,8 +190,8 @@ public:
             obDouble_[i + 15] = bodyAngVel_[i];
         }
 
-        for (size_t i = 0; i < 3; i++) {
-            obDouble_[i + 18] = quat_.e()[i];
+        for (size_t i = 0; i < 4; i++) {
+            obDouble_[i + 18] = quat_[i];
         }
     }
 
@@ -259,6 +267,7 @@ public:
     Eigen::Vector3d bodyPos_, bodyLinVel_, bodyAngVel_;
     Eigen::Matrix3d bodyRot_;
 
+    Eigen::Vector4d normedControlThrusts_;
     Eigen::VectorXd thrusts_, controlThrusts_;
     Eigen::Matrix4d thrusts2TorquesAndForces_;
     Eigen::Vector4d torquesAndForces_;

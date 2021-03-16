@@ -14,9 +14,9 @@ environment:
 
   reward:
     position:
-      coeff: -0.02
+      coeff: -0.002
     thrust:
-      coeff: 0.1
+      coeff: 0.001
     orientation:
       coeff: -0.002
     angularVelocity:

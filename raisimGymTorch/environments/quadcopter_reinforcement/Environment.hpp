@@ -8,10 +8,8 @@
 #include <cstdint>
 #include <set>
 #include "../../RaisimGymEnv.hpp"
-#include "include/quaternionToEuler.hpp"
 #include <cmath>
 #include "Eigen/Dense"
-
 
 namespace raisim {
 
@@ -84,17 +82,27 @@ namespace raisim {
         void init() final {}
 
         void reset() final {
+            /// set random target point
+            if (loopCount_ == 0){
+                double spawnChance = generateRandomValue(0,1);
+                if (spawnChance > 0.5){
+                    gc_init_[2] = 0.135;
+                }
+                else{
+                    gc_init_[2] = 10.135;
+                }
+                targetPoint_[0] = generateRandomValue(-10, 10);
+                targetPoint_[1] = generateRandomValue(-10, 10);
+                targetPoint_[2] = generateRandomValue(2.5, 7.5);
+            }
+            loopCount_++;
+            if (loopCount_ == 8) loopCount_ = 0;
             robot_->setState(gc_init_, gv_init_);
 
-            /// set random target point
-            targetPoint_[0] = generateRandomValue(-5, 5);
-            targetPoint_[1] = generateRandomValue(-5, 5);
-            targetPoint_[2] = generateRandomValue(2, 5);
             if (visualizable_){
                 server_->focusOn(robot_);
                 visPoint->setPosition(targetPoint_.head(3));
             }
-
             updateObservation();
         }
 
@@ -118,12 +126,17 @@ namespace raisim {
             /// scale bounded action input to thrusts
             controlThrusts_ = controlThrusts_.cwiseProduct(actionStd_);
             controlThrusts_ += actionMean_;
+            //thrusts_ = controlThrusts_;
+
+            /// apply simple motor delay model with rotor delay
+
+            // apply thrust
+
 
             for (int i = 0; i < int(control_dt_ / simulation_dt_ + 1e-10); i++) {
                 if (server_) server_->lockVisualizationServerMutex();
                 applyThrusts();
                 world_->integrate();
-                /// apply simple motor delay model with rotor delay
                 for (int i = 0; i<4; i++){
                     if (thrusts_[i]<controlThrusts_[i]) {  // time constant for increasing rotor speed
                         thrusts_[i] = thrusts_[i] + (controlThrusts_[i] - thrusts_[i]) * simulation_dt_ / 0.0125;
@@ -140,7 +153,6 @@ namespace raisim {
             rewards_.record("thrust", normedControlThrusts_.mean());
             rewards_.record("orientation", std::abs(eulerAngles_(2)));
             rewards_.record("angularVelocity", std::abs(bodyAngVel_.mean()));
-
 
             return rewards_.sum();
         }
@@ -179,7 +191,7 @@ namespace raisim {
             }
 
             for (size_t i = 0; i < 4; i++) {
-                obDouble_[i + 18] = quat_.e()[i];
+                obDouble_[i + 18] = quat_[i];
             }
         }
 
@@ -190,7 +202,6 @@ namespace raisim {
 
             return distr(eng);
         }
-
         void calculateEulerAngles(){
             double sinr_cosp = 2 * (quat_[0] * quat_[1] + quat_[2] * quat_[3]);
             double cosr_cosp = 1 - 2 * (quat_[1] * quat_[1] + quat_[2] * quat_[2]);
@@ -209,6 +220,7 @@ namespace raisim {
             double cosy_cosp = 1 - 2 * (quat_[2] * quat_[2] + quat_[3] * quat_[3]);
             eulerAngles_[2] = std::atan2(siny_cosp, cosy_cosp);
         }
+
 
         void observe(Eigen::Ref<EigenVec> ob) final {
             /// convert it to float
@@ -239,7 +251,6 @@ namespace raisim {
 
             for(auto& contact: robot_->getContacts()) {
                 if (bodyIndices_.find(contact.getlocalBodyIndex()) == bodyIndices_.end())
-                    terminalReward = -10.f;
                     return true;
             }
 
@@ -270,7 +281,7 @@ namespace raisim {
         const double rps_ = 2 * M_PI, rpm_ = rps_/60;
         const double g_ = 9.81, m_ = 1.727;
         const double hoverThrust_ = m_ * g_ / 4;
-        int loopCount_;
+        int loopCount_ = 0;
 
         int gcDim_, gvDim_, nRotors_;
         bool visualizable_ = true;

@@ -76,7 +76,7 @@ total_steps = n_steps * env.num_envs
 
 
 # Expert: PID Controller and target point
-expert = PID(2.5, 20, 6, ob_dim_expert, act_dim, cfg['environment']['control_dt'], 1.727, normalize_action=True)
+expert = PID(2.8, 20, 6, ob_dim_expert, act_dim, cfg['environment']['control_dt'], 1.727)
 expert_actions = np.zeros(shape=(env.num_envs, act_dim), dtype="float32")
 targets = np.zeros(shape=(env.num_envs, ob_dim_expert), dtype="float32")
 
@@ -167,7 +167,7 @@ for update in range(10000):
             for step in range(int(n_steps*1.5)):
                 frame_start = time.time()
 
-                # separate and expert obs with dim 22 and (normalized) learner obs with dim 18
+                # separate and expert obs with dim 21 and (normalized) learner obs with dim 18
                 expert_obs = env.observe()
                 learner_obs = expert_obs.copy()
                 for i in range(0, env.num_envs):
@@ -203,9 +203,9 @@ for update in range(10000):
     """ Actual training """
     for step in range(n_steps):
         # visualize while training
-        env.turn_on_visualization()
+        #env.turn_on_visualization()
 
-        # separate and expert obs with dim=22 and (normalized) learner obs with dim=18
+        # separate and expert obs with dim=21 and (normalized) learner obs with dim=18
         learner_obs = expert_obs.copy()
         expert_obs += targets
         for i in range(0, env.num_envs):
@@ -215,7 +215,7 @@ for update in range(10000):
         # choose an expert action per environment
         for i in range(0, env.num_envs):
             expert_obs_env_i = expert_obs[i, :]
-            expert_actions[i, :] = expert.control(obs=expert_obs_env_i.reshape((22, 1)),
+            expert_actions[i, :] = expert.control(obs=expert_obs_env_i.reshape((ob_dim_expert, 1)),
                                                   target=targets[i][0:12].reshape((12, 1)), loopCount=loopCount)
 
         # choose an expert action with beta-probability or learner action with (1-beta) probability
@@ -226,12 +226,12 @@ for update in range(10000):
 
         # for outter pid-control loop running five times slower
         if loopCount == 5:
-            loopCount = 0
+            loopCount = 1
         loopCount += 1
 
         expert_obs = env.observe()
 
-        env.turn_off_visualization()
+        #env.turn_off_visualization()
 
     learner_obs = expert_obs.copy()
     expert_obs += targets

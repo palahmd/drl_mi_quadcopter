@@ -74,7 +74,7 @@ else:
     env.reset()
     env.turn_on_visualization()
     #env.start_video_recording(datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S") + "test"+'.mp4')
-
+    #time.sleep(2)
     for step in range(n_steps * 2):
         frame_start = time.time()
         learner_obs = env.observe()
@@ -82,13 +82,9 @@ else:
             obs[i] = learner_obs[i][0:18].copy()
         obs = helper.normalize_observation(obs)
 
-        print(obs)
-
-
         action_ll = loaded_graph.architecture(torch.from_numpy(obs))
         action_ll = helper.limit_action(action_ll)
 
-        print(action_ll)
 
         reward_ll, dones = env.step(action_ll)
         reward_ll_sum = reward_ll_sum + reward_ll[0]
@@ -109,7 +105,7 @@ else:
             start_step_id = step + 1
             reward_ll_sum = 0.0
 
-    #env.stop_video_recording()
+    env.stop_video_recording()
     env.turn_off_visualization()
     env.reset()
     print("Finished at the maximum visualization steps")

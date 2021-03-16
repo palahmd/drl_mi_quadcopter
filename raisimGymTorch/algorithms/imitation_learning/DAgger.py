@@ -73,10 +73,8 @@ class DAgger:
 
         # set expert action and calculate leraner action
         self.expert_actions = torch.from_numpy(expert_actions).to(self.device)
-        if self.deterministic_policy:
-            self.learner_actions = self.actor.noiseless_action(torch.from_numpy(actor_obs).to(self.device))
-        else:
-            self.learner_actions, self.learner_actions_log_prob = self.actor.sample(torch.from_numpy(actor_obs).to(self.device))
+        self.learner_actions = self.actor.noiseless_action(torch.from_numpy(actor_obs).to(self.device))
+        #self.learner_actions, self.learner_actions_log_prob = self.actor.sample(torch.from_numpy(actor_obs).to(self.device))
 
         # take expert action with beta prob. and policy action with (1-beta) prob.
         self.choose_action_per_env()

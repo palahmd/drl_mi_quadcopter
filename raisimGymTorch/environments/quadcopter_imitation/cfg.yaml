@@ -10,13 +10,13 @@ environment:
   num_envs: 96
   eval_every_n: 20
   visualize_eval: True
-  num_threads: 24
+  num_threads: 30
 
   reward:
     position:
-      coeff: 0.002
+      coeff: -0.002
     thrust:
-      coeff: 0.0001
+      coeff: 0.01
     orientation:
       coeff: -0.002
     angularVelocity:
@@ -38,12 +38,12 @@ helper:
 
 hyperparam:
   num_mini_batches: 8
-  num_learning_epochs: 8
+  num_learning_epochs: 10
   shuffle: True # True should give better sample efficiency
   Gamma: 0.99
-  init_beta: 1
-  Beta: 0.4
-  beta_scheduler: 0.001
+  init_beta: 1.0
+  Beta: 0.1
+  beta_scheduler: 0.005
   learning_rate: 0.0005
   l2_reg_weight: 0.005
   entropy_weight: 0.0
