@@ -96,7 +96,7 @@ namespace raisim {
                 targetPoint_[2] = generateRandomValue(2.5, 7.5);
             }
             loopCount_++;
-            if (loopCount_ == 8) loopCount_ = 0;
+            if (loopCount_ == 10) loopCount_ = 0;
             robot_->setState(gc_init_, gv_init_);
 
             if (visualizable_){
@@ -149,10 +149,20 @@ namespace raisim {
 
             updateObservation();
 
-            rewards_.record("position", std::sqrt((targetPoint_.head(3) - bodyPos_).transpose() * (targetPoint_.head(3) - bodyPos_)));
-            rewards_.record("thrust", normedControlThrusts_.mean());
-            rewards_.record("orientation", std::abs(eulerAngles_(2)));
-            rewards_.record("angularVelocity", std::abs(bodyAngVel_.mean()));
+            relativeAbsPosition = std::sqrt((targetPoint_.head(3) - bodyPos_).norm());
+
+            if (relativeAbsPosition < 1){
+                relPositionReward = 1 - relativeAbsPosition;
+            }
+            else{
+                relPositionReward = 0;
+            }
+
+            rewards_.record("position", relativeAbsPosition);
+            rewards_.record("relPosition", relPositionReward);
+            rewards_.record("thrust", normedControlThrusts_.norm());
+            rewards_.record("orientation", std::acos(bodyRot_(2,1)));
+            rewards_.record("angularVelocity", bodyAngVel_.norm());
 
             return rewards_.sum();
         }
@@ -167,7 +177,7 @@ namespace raisim {
             bodyLinVel_ = bodyRot_ * gv_.segment(0,3);
             bodyAngVel_ = bodyRot_ * gv_.segment(3,3);
             robot_->getBaseOrientation(quat_);
-            calculateEulerAngles();
+            //calculateEulerAngles();
 
             /// observation vector (later for RL-Algorithm)
             for (size_t i = 0; i < 3; i++) {
@@ -282,6 +292,8 @@ namespace raisim {
         const double g_ = 9.81, m_ = 1.727;
         const double hoverThrust_ = m_ * g_ / 4;
         int loopCount_ = 0;
+        double relativeAbsPosition;
+        double relPositionReward;
 
         int gcDim_, gvDim_, nRotors_;
         bool visualizable_ = true;

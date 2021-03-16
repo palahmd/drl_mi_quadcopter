@@ -7,16 +7,18 @@ environment:
   max_time: 15.0
   render: True
 
-  num_envs: 96
-  eval_every_n: 50
+  num_envs: 480
+  eval_every_n: 40
   visualize_eval: True
-  num_threads: 30
+  num_threads: 40
 
   reward:
     position:
       coeff: -0.002
+    relPosition:
+      coeff: 0.004
     thrust:
-      coeff: 0.001
+      coeff: 0.0001
     orientation:
       coeff: -0.002
     angularVelocity:
@@ -36,14 +38,14 @@ helper:
   clip_action: False # either scale or clip action to [-1, 1]. Also works fine.
 
 hyperparam:
-  num_mini_batches: 4
-  num_learning_epochs: 4
+  num_mini_batches: 20
+  num_learning_epochs: 6
   shuffle: False
   Gamma: 0.99
   Lambda: 0.95
   learning_rate: 0.0005
-  value_loss_coef: 1
-  use_clipped_value_loss: False # if True: PPO2, False: PPO
+  value_loss_coef: 0.5
+  use_clipped_value_loss: True # if True: PPO2, False: PPO
   entropy_coef: 0.0
 
 
