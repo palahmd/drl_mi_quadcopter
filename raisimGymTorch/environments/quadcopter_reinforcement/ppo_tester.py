@@ -1,5 +1,5 @@
 from ruamel.yaml import YAML, dump, RoundTripDumper
-from raisimGymTorch.env.bin import quadcopter_imitation
+from raisimGymTorch.env.bin import quadcopter_reinforcement
 from raisimGymTorch.env.RaisimGymVecEnv import RaisimGymVecEnv as VecEnv
 import raisimGymTorch.algo.shared_modules.actor_critic as module
 from raisimGymTorch.helper.env_helper.env_helper import helper
@@ -28,7 +28,7 @@ cfg = YAML().load(open(task_path + "/cfg.yaml", 'r'))
 # create environment from the configuration file
 cfg['environment']['num_envs'] = 1
 
-env = VecEnv(quadcopter_imitation.RaisimGymEnv(home_path + "/../rsc", dump(cfg['environment'], Dumper=RoundTripDumper)),
+env = VecEnv(quadcopter_reinforcement.RaisimGymEnv(home_path + "/../rsc", dump(cfg['environment'], Dumper=RoundTripDumper)),
              cfg['environment'], normalize_ob=False)
 # shortcuts
 ob_dim_expert = env.num_obs
@@ -81,6 +81,8 @@ else:
         for i in range(0, env.num_envs):
             obs[i] = learner_obs[i][0:18].copy()
         obs = helper.normalize_observation(obs)
+
+        print(obs)
 
         action_ll = loaded_graph.architecture(torch.from_numpy(obs))
         action_ll = helper.limit_action(action_ll)

@@ -2,17 +2,21 @@ seed: 1
 record_video: yes
 
 environment:
-  render: True
-  # just testing commenting
-  num_envs: 1
-  eval_every_n: 1
-  num_threads: 1
-  simulation_dt: 0.0025
+  simulation_dt: 0.001
   control_dt: 0.01
-  max_time: 9
+  max_time: 11.0
+  render: True
+
+  num_envs: 1
+  eval_every_n: 40
+  visualize_eval: True
+  num_threads: 40
+
   reward:
     position:
       coeff: -0.002
+    relPosition:
+      coeff: 0.004
     thrust:
       coeff: 0.0001
     orientation:
@@ -24,3 +28,24 @@ environment:
 architecture:
   policy_net: [64, 64]
   value_net: [64, 64]
+  activation_fn: nn.LeakyReLU
+  deterministic_policy: False
+
+helper:
+  normalize_ob: False
+  update_mean: True
+  scale_action: False # because scaling is done in Environment.hpp for better performance
+  clip_action: False # either scale or clip action to [-1, 1]. Also works fine.
+
+hyperparam:
+  num_mini_batches: 20
+  num_learning_epochs: 6
+  shuffle: False
+  Gamma: 0.99
+  Lambda: 0.95
+  learning_rate: 0.0005
+  value_loss_coef: 0.5
+  use_clipped_value_loss: True # if True: PPO2, False: PPO
+  entropy_coef: 0.0
+
+

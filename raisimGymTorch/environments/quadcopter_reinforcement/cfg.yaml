@@ -4,7 +4,7 @@ record_video: yes
 environment:
   simulation_dt: 0.001
   control_dt: 0.01
-  max_time: 15.0
+  max_time: 11.0
   render: True
 
   num_envs: 480

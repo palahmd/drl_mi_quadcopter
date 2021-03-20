@@ -25,7 +25,7 @@ namespace raisim {
                     resourceDir_ + "/ITM-quadcopter/urdf/ITM-quadcopter.urdf");
             robot_->setName("Quaddy");
             robot_->setIntegrationScheme(raisim::ArticulatedSystem::IntegrationScheme::RUNGE_KUTTA_4);
-            world_->addGround(0);
+            world_->addGround(-10);
 
             /// get robot data
             gcDim_ = robot_->getGeneralizedCoordinateDim();
@@ -83,6 +83,7 @@ namespace raisim {
 
         void reset() final {
             /// set random target point
+            /*
             if (loopCount_ == 0){
                 double spawnChance = generateRandomValue(0,1);
                 if (spawnChance > 0.5){
@@ -97,13 +98,33 @@ namespace raisim {
             }
             loopCount_++;
             if (loopCount_ == 10) loopCount_ = 0;
+            */
+            float dummy;
+            do{
+                for (int i=0; i<3; i++){
+                    gc_init_(i) = generateRandomValue(-1, 1);
+                }
+                for (int i=0; i<4; i++){
+                    gc_init_(i+3) = generateRandomValue(-1, 1);
+                }
+                gc_.segment(3,4) /= gc_.segment(3,4).norm();
+                for (int i=0; i<3; i++){
+                    gv_init_(i) = generateRandomValue(-1, 1);
+                }
+                for (int i=0; i<3; i++){
+                    gv_init_(i+3) = generateRandomValue(-1, 1);
+                }
+            } while( isTerminalState(dummy) );
+
             robot_->setState(gc_init_, gv_init_);
 
             if (visualizable_){
                 server_->focusOn(robot_);
                 visPoint->setPosition(targetPoint_.head(3));
             }
+            raisim::MSLEEP(0.5);
             updateObservation();
+            raisim::MSLEEP(0.5);
         }
 
         float step(const Eigen::Ref<EigenVec> &action) final {
@@ -151,8 +172,8 @@ namespace raisim {
 
             relativeAbsPosition = std::sqrt((targetPoint_.head(3) - bodyPos_).norm());
 
-            if (relativeAbsPosition < 1){
-                relPositionReward = 1 - relativeAbsPosition;
+            if (relativeAbsPosition < 0.6){
+                relPositionReward = 1 - (1/0.6) * relativeAbsPosition;
             }
             else{
                 relPositionReward = 0;
@@ -258,7 +279,7 @@ namespace raisim {
         bool isTerminalState(float& terminalReward) final {
             terminalReward = float(terminalRewardCoeff_);
 
-
+            /*
             for(auto& contact: robot_->getContacts()) {
                 if (bodyIndices_.find(contact.getlocalBodyIndex()) == bodyIndices_.end())
                     return true;
@@ -266,7 +287,7 @@ namespace raisim {
 
             if (std::abs((gc_.head(3)).mean()) > 30){
                 return true;
-            }
+            }*/
 
             terminalReward = 0.f;
             return false;

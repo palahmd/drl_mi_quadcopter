@@ -42,6 +42,11 @@ class helper:
             if self.update_mean:
                 self.obs_rms.update(observation)
 
+            max_ob = observation[0:3].max()
+            if max_ob > self.clip_obs:
+                observation[0:3] /= (max_ob/self.clip_obs)
+                return observation
+
             observation_norm = np.clip((observation - self.obs_rms.mean) / np.sqrt(self.obs_rms.var + 1e-8), - self.clip_obs,
                         self.clip_obs)
 
