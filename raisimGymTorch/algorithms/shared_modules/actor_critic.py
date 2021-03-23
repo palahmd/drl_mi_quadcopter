@@ -81,7 +81,7 @@ class MLP(nn.Module):
             scale.append(np.sqrt(2))
 
         modules.append(nn.Linear(shape[-1], output_size))
-        #modules.append(nn.Sigmoid())
+        modules.append(nn.Identity())
         self.architecture = nn.Sequential(*modules)
         scale.append(np.sqrt(2))
 

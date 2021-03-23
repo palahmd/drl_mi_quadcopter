@@ -45,7 +45,7 @@ raisim_unity_Path = home_path + "/raisimUnity/raisimUnity.x86_64"
 saver = ConfigurationSaver(log_dir=home_path + "/training/imitation",
                            save_items=[task_path + "/cfg.yaml", task_path + "/Environment.hpp"])
 start_date = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-#tensorboard_launcher(saver.data_dir+"/..")  # press refresh (F5) after the first ppo update
+tensorboard_launcher(saver.data_dir+"/..")  # press refresh (F5) after the first ppo update
 
 # config and config related options
 cfg = YAML().load(open(task_path + "/cfg.yaml", 'r'))
@@ -79,6 +79,7 @@ total_steps = n_steps * env.num_envs
 expert = PID(2.8, 20, 6, ob_dim_expert, act_dim, cfg['environment']['control_dt'], 1.727)
 expert_actions = np.zeros(shape=(env.num_envs, act_dim), dtype="float32")
 targets = np.zeros(shape=(env.num_envs, ob_dim_expert), dtype="float32")
+last_targets = targets.copy()
 
 # Actor and Critic
 actor = module.Actor(module.MLP(cfg['architecture']['policy_net'],
@@ -94,6 +95,11 @@ critic = module.Critic(module.MLP(cfg['architecture']['value_net'],
                                           1),
                        device=device)
 
+if mode == 'retrain':
+    last_update = int(weight_path.rsplit('/', 1)[1].split('_', 1)[1].rsplit('.', 1)[0])
+else:
+    last_update = 0
+
 # Imitation Learner: DAgger
 learner = DAgger(actor=actor, critic=critic, act_dim=act_dim,
                  num_envs=cfg['environment']['num_envs'],
@@ -104,9 +110,11 @@ learner = DAgger(actor=actor, critic=critic, act_dim=act_dim,
                  beta=cfg['hyperparam']['Beta'],
                  l2_reg_weight=cfg['hyperparam']['l2_reg_weight'],
                  entropy_weight=cfg['hyperparam']['entropy_weight'],
-                 learning_rate=cfg['hyperparam']['learning_rate'],
+                 use_lr_scheduler=cfg['hyperparam']['use_lr_scheduler'],
+                 min_lr=cfg['hyperparam']['min_lr'],
+                 max_lr=cfg['hyperparam']['max_lr'],
+                 last_update=last_update,
                  beta_scheduler=cfg['hyperparam']['beta_scheduler'],
-                 log_prob_loss=cfg['hyperparam']['log_prob_loss'],
                  deterministic_policy=cfg['architecture']['deterministic_policy'],
                  device=device)
 
@@ -119,19 +127,17 @@ helper = helper(env=env, num_obs=ob_dim_learner,
 learner.beta = cfg['hyperparam']['init_beta']
 
 if mode == 'retrain':
-    load_param(weight_path, env, actor, critic, learner.optimizer, saver.data_dir)
-    last_update = int(weight_path.rsplit('/', 1)[1].split('_', 1)[1].rsplit('.', 1)[0])
+    helper.load_param(weight_path, actor, critic, learner.optimizer, learner.scheduler, saver.data_dir)
     helper.load_scaling(weight_path, last_update)
-else:
-    last_update = 0
-
+    learner.beta = cfg['hyperparam']['init_beta'] - learner.beta_scheduler * last_update
 
 
 """ 
 Training Loop
 """
 
-for update in range(10000):
+
+for update in range(2000):
     env.reset()
     start = time.time()
 
@@ -141,7 +147,14 @@ for update in range(10000):
     # optional: skip first visualization with update = 1
     if update == 0:
         update = 1
+        env.turn_off_visualization()
     update += last_update
+
+    expert_obs = env.observe()
+    targets = init_state - expert_obs.copy()
+    if update % 10 == 0:
+        learner.scheduler.step(epoch=-1)
+    print(targets)
 
     """ Evaluation and saving of the models """
     if update % cfg['environment']['eval_every_n'] == 0:
@@ -151,6 +164,7 @@ for update in range(10000):
             'actor_distribution_state_dict': actor.distribution.state_dict(),
             'critic_architecture_state_dict': critic.architecture.state_dict(),
             'optimizer_state_dict': learner.optimizer.state_dict(),
+            'scheduler_state_dict': learner.scheduler.state_dict(),
         }, saver.data_dir+"/full_"+str(update)+'.pt')
         helper.save_scaling(saver.data_dir, str(update))
 
@@ -158,17 +172,16 @@ for update in range(10000):
             print("Visualizing and evaluating the current policy")
 
             # open raisimUnity and wait until it has started and focused on robot
-            proc = subprocess.Popen(raisim_unity_Path)
-            time.sleep(7)
-            env.reset()
             env.turn_on_visualization()
+            proc = subprocess.Popen(raisim_unity_Path)
+            time.sleep(8)
             env.start_video_recording(start_date + "policy_" + str(update) + '.mp4')
+            time.sleep(2)
 
             for step in range(int(n_steps*1.5)):
-                frame_start = time.time()
+                #frame_start = time.time()
 
                 # separate and expert obs with dim 21 and (normalized) learner obs with dim 18
-                expert_obs = env.observe()
                 learner_obs = expert_obs.copy()
                 for i in range(0, env.num_envs):
                     obs[i] = learner_obs[i][0:18]
@@ -179,13 +192,15 @@ for update in range(10000):
                 action_ll = helper.limit_action(action_ll)
 
                 _, _ = env.step(action_ll)
+                expert_obs = env.observe()
 
                 # stop simulation for fluent visualization
-                frame_end = time.time()
-                wait_time = cfg['environment']['control_dt'] - (frame_end-frame_start)
-                if wait_time > 0:
-                    time.sleep(wait_time)
+                #frame_end = time.time()
+                #wait_time = cfg['environment']['control_dt'] - (frame_end-frame_start)
+                #if wait_time > 0:
+                #    time.sleep(wait_time)
 
+                time.sleep(cfg['environment']['control_dt'])
             env.stop_video_recording()
             env.turn_off_visualization()
 
@@ -197,8 +212,7 @@ for update in range(10000):
 
 
     # set target point: target point is randomly defined in Environment.hpp
-    expert_obs = env.observe()
-    targets = init_state - expert_obs.copy()
+
 
     """ Actual training """
     for step in range(n_steps):
@@ -226,7 +240,7 @@ for update in range(10000):
 
         # for outter pid-control loop running five times slower
         if loopCount == 5:
-            loopCount = 1
+            loopCount = 0
         loopCount += 1
 
         expert_obs = env.observe()
@@ -259,3 +273,5 @@ for update in range(10000):
     print('action std: ')
     print(actor.distribution.std.cpu().detach().numpy())
     print('----------------------------------------------------\n')
+
+

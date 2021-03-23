@@ -2,7 +2,7 @@ seed: 1
 record_video: yes
 
 environment:
-  simulation_dt: 0.001
+  simulation_dt: 0.002
   control_dt: 0.01
   max_time: 11.0
   render: True
@@ -15,12 +15,14 @@ environment:
   reward:
     position:
       coeff: -0.002
+    relPosition:
+      coeff: 0.002
     thrust:
-      coeff: 0.01
+      coeff: 0.0
     orientation:
-      coeff: -0.002
+      coeff: -0.0002
     angularVelocity:
-      coeff: -0.0001
+      coeff: 0.0
 
 
 architecture:
@@ -28,24 +30,26 @@ architecture:
   value_net: [64, 64]
   activation_fn: nn.LeakyReLU
   deterministic_policy: False # if True: does not converge, because action loss will be used instead of log prob action loss
+                              # False: loss = -logProb
 
 helper:
-  normalize_ob: False
-  update_mean: True
+  normalize_ob: Flase # might make no sense in this task
+  update_mean: False
   scale_action: False # because scaling is done in Environment.hpp for better performance
   clip_action: False # either scale or clip action to [-1, 1]. Also works fine.
 
 
 hyperparam:
-  num_mini_batches: 8
-  num_learning_epochs: 10
+  num_mini_batches: 4
+  num_learning_epochs: 30
   shuffle: True # True should give better sample efficiency
   Gamma: 0.99
   init_beta: 1.0
-  Beta: 0.1
-  beta_scheduler: 0.005
-  learning_rate: 0.0005
+  Beta: 0.7
+  beta_scheduler: 0.001
+  use_lr_scheduler: True
+  max_lr: 0.01
+  min_lr: 0.0005 # is the actual learning rate if use_lr_scheduler = False
   l2_reg_weight: 0.005
   entropy_weight: 0.0
-  log_prob_loss: True # if True: best performance
 
