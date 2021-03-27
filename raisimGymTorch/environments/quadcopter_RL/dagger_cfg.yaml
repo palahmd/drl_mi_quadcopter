@@ -43,7 +43,7 @@ hyperparam:
   num_mini_batches: 6
   num_learning_epochs: 30
   shuffle: True # True should give better sample efficiency
-  Gamma: 0.99
+  Gamma: 0.995
   init_beta: 1.0
   Beta: 0.7
   beta_scheduler: 0.001

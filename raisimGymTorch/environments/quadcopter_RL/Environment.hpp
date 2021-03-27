@@ -150,10 +150,20 @@ namespace raisim {
 
             updateObservation();
 
-            rewards_.record("position", std::sqrt((targetPoint_.head(3) - bodyPos_).transpose() * (targetPoint_.head(3) - bodyPos_)));
-            rewards_.record("thrust", normedControlThrusts_.mean());
-            rewards_.record("orientation", std::abs(eulerAngles_(2)));
-            rewards_.record("angularVelocity", std::abs(bodyAngVel_.mean()));
+            relativeAbsPosition = std::sqrt((targetPoint_.head(3) - bodyPos_).norm());
+
+            if (relativeAbsPosition < 1){
+                relPositionReward = 1 - relativeAbsPosition;
+            }
+            else{
+                relPositionReward = 0;
+            }
+
+            rewards_.record("position", relativeAbsPosition);
+            rewards_.record("relPosition", relPositionReward);
+            rewards_.record("thrust", normedControlThrusts_.norm());
+            rewards_.record("orientation", std::acos(bodyRot_(2,1)));
+            rewards_.record("angularVelocity", bodyAngVel_.norm());
 
             return rewards_.sum();
         }
@@ -207,15 +217,15 @@ namespace raisim {
             for(auto& contact: robot_->getContacts()) {
                 if (bodyIndices_.find(contact.getlocalBodyIndex()) == bodyIndices_.end()) {
                     /// prevents the random target to change too early; return true will call reset() and change loopCount_
-                    if (nRandomTargets) loopCount_--;
-                    if (singleRandomTarget) loopCount_++;
+                    loopCount_++;
+                    updateTarget = false;
                     return true;
                 }
             }
 
             if (std::abs((gc_.head(3)).mean()) > 30){
-                if (nRandomTargets) loopCount_--;
-                if (singleRandomTarget) loopCount_++;
+                loopCount_++;
+                updateTarget = false;
                 return true;
             }
 
@@ -247,26 +257,31 @@ namespace raisim {
         void setSingleRandomTarget(double radius){
             /// target will be updated everytime environment is reset
             if (visualizable_) {
-                for(int i =0; i>3, i++) targetPoint_[i] = generateRandomValue(-1, 1);
-                targetPoint_.head(3) /= targetPoint_.norm() * radius; // target point has distance of 10 m within a sphere
+                for(int i =0; i<3; i++) targetPoint_(i) = generateRandomValue(-1, 1);
+                targetPoint_.head(3) /= targetPoint_.head(3).norm();
+                targetPoint_.head(3) *= 10; // target point has distance of 10 m within a sphere
                 visPoint->setPosition(targetPoint_.head(3));
             }
             loopCount_ = 0;
-            singleRandomTarget = True;
+            singleRandomTarget = true;
         }
 
         void setNRandomTargets(double radius, int updateRate){
-            if (loopCount_ == 0){
-                for(int i =0; i>3, i++) targetPoint_[i] = generateRandomValue(-1, 1);
-                targetPoint_.head(3) /= targetPoint_.norm() * radius; // target point has distance of 10 m within a sphere
-
+            if (updateTarget){
+                for(int i =0; i<3; i++) targetPoint_(i) = generateRandomValue(-1, 1);
+                targetPoint_.head(3) /= targetPoint_.head(3).norm();
+                targetPoint_.head(3) *= 10; // target point has distance of 10 m within a sphere
                 if (visualizable_) visPoint->setPosition(targetPoint_.head(3));
+                updateTarget = false;
             }
 
-            /// update target after specific amount of environment resets
-            loopCount_++;
-            if (loopCount_ == updateRate) loopCount_ = 0;
-            nRandomTargets = True;
+            /// update target after specific amount of environment resets. updateRate is count in reversed order.
+            if (loopCount_ <= 0) {
+                loopCount_ = updateRate;
+                updateTarget = true;
+            }
+            loopCount_--;
+            nRandomTargets = true;
         }
 
         void setRandomState(double pos, bool rot, double vel, double angVel){
@@ -314,6 +329,14 @@ namespace raisim {
             eulerAngles_[2] = std::atan2(siny_cosp, cosy_cosp);
         }
 
+        bool visualizable_ = true;
+        raisim::ArticulatedSystem* robot_;
+        raisim::Visuals* visPoint;
+
+        int gcDim_, gvDim_, nRotors_;
+        Eigen::VectorXd gc_init_, gv_init_, gc_, gv_;
+        Eigen::VectorXd obDouble_, targetPoint_;
+        Eigen::Vector4d actionMean_, actionStd_;
 
         raisim::Mat<3,3> worldRot_;
         raisim::Vec<4> quat_;
@@ -334,24 +357,20 @@ namespace raisim {
         const double rps_ = 2 * M_PI, rpm_ = rps_/60;
         const double g_ = 9.81, m_ = 1.727;
         const double hoverThrust_ = m_ * g_ / 4;
-        int loopCount_ = 0;
 
-        int gcDim_, gvDim_, nRotors_;
-        bool visualizable_ = true;
-        raisim::ArticulatedSystem* robot_;
-        Eigen::VectorXd gc_init_, gv_init_, gc_, gv_;
-        double terminalRewardCoeff_ = -5.;
-        Eigen::VectorXd obDouble_, targetPoint_;
-        Eigen::Vector4d actionMean_, actionStd_;
-        std::set<size_t> baseIndex_;
+        /// reward related
         raisim::Reward rewards_;
         std::set<size_t> bodyIndices_;
-
-        raisim::Visuals* visPoint;
+        std::set<size_t> baseIndex_;
+        double terminalRewardCoeff_ = -5.;
+        double relativeAbsPosition;
+        double relPositionReward;
 
         /// other variables
-        bool singleRandomTarget = False;
-        bool nRandomTargets = False;
+        bool singleRandomTarget = false;
+        bool nRandomTargets = false;
+        bool updateTarget = false;
+        int loopCount_ = 0;
     };
 }
 

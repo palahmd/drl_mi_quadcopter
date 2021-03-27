@@ -43,9 +43,9 @@ raisim_unity_Path = home_path + "/raisimUnity/raisimUnity.x86_64"
 
 # logging
 saver = ConfigurationSaver(log_dir=home_path + "/training/imitation_learning",
-                           save_items=[task_path + "/cfg.yaml", task_path + "/Environment.hpp"])
+                           save_items=[task_path + "/dagger_cfg.yaml", task_path + "/Environment.hpp"])
 start_date = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-#tensorboard_launcher(saver.data_dir+"/..")  # press refresh (F5) after the first ppo update
+tensorboard_launcher(saver.data_dir+"/..")  # press refresh (F5) after the first ppo update
 
 # config and config related options
 cfg = YAML().load(open(task_path + "/dagger_cfg.yaml", 'r'))
@@ -156,15 +156,22 @@ for update in range(2000):
     all envs, the target will be given to the otehr envs as an action with the only Python->C++ interface 
     env.step(action). In the Environment.hpp file, the in the step method the action (here: target of env[0]) can be set 
     as the target of all envs."""
-    expert_obs = env.observe()
-    vis_target = init_state - expert_obs[0]
-    for i in range(len(targets)):
-        targets[i] = vis_target
-        env_target[i] = vis_target[0][0:4]
+    #expert_obs = env.observe()
+    #vis_target = init_state - expert_obs[0]
+    #for i in range(len(targets)):
+    #    targets[i] = vis_target
+    #    env_target[i] = vis_target[0][0:4]
 
-    _, _ = env.step(env_target)
-    expert_obs = env.observe()
+    #_, _ = env.step(env_target)
+    #expert_obs = env.observe()
 
+    last_targets = targets.copy()
+    expert_obs = env.observe()
+    targets = expert_obs.copy()
+
+    if last_targets[0][0] != targets[0][0]:
+        learner.scheduler.step(epoch=-1)
+        print("scheduler reset")
 
     """ Evaluation and saving of the models """
     if update % cfg['environment']['eval_every_n'] == 0:
@@ -184,9 +191,8 @@ for update in range(2000):
             # open raisimUnity and wait until it has started and focused on robot
             env.turn_on_visualization()
             proc = subprocess.Popen(raisim_unity_Path)
-            time.sleep(8)
+            time.sleep(7)
             env.start_video_recording(start_date + "policy_" + str(update) + '.mp4')
-            time.sleep(2)
 
             for step in range(int(n_steps*1.5)):
                 #frame_start = time.time()
@@ -218,8 +224,6 @@ for update in range(2000):
             # close raisimUnity to use less ressources
             proc.kill()
             #os.kill(proc.pid+1, signal.SIGKILL) # if proc.kill() does not work
-
-            env.reset()
 
 
 
