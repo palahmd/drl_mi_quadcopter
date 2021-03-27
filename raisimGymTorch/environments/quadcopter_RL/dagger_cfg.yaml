@@ -40,7 +40,7 @@ helper:
 
 
 hyperparam:
-  num_mini_batches: 4
+  num_mini_batches: 6
   num_learning_epochs: 30
   shuffle: True # True should give better sample efficiency
   Gamma: 0.99

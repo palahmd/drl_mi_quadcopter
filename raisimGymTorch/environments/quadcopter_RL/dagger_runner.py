@@ -1,5 +1,5 @@
 from ruamel.yaml import YAML, dump, RoundTripDumper
-from raisimGymTorch.env.bin import quadcopter_imitation
+from raisimGymTorch.env.bin import quadcopter_RL
 from raisimGymTorch.env.RaisimGymVecEnv import RaisimGymVecEnv as VecEnv
 from raisimGymTorch.algo.pid_controller.pid_controller import PID
 from raisimGymTorch.algo.imitation_learning.DAgger import DAgger
@@ -42,17 +42,17 @@ home_path = task_path + "/../.."
 raisim_unity_Path = home_path + "/raisimUnity/raisimUnity.x86_64"
 
 # logging
-saver = ConfigurationSaver(log_dir=home_path + "/training/imitation",
+saver = ConfigurationSaver(log_dir=home_path + "/training/imitation_learning",
                            save_items=[task_path + "/cfg.yaml", task_path + "/Environment.hpp"])
 start_date = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-tensorboard_launcher(saver.data_dir+"/..")  # press refresh (F5) after the first ppo update
+#tensorboard_launcher(saver.data_dir+"/..")  # press refresh (F5) after the first ppo update
 
 # config and config related options
-cfg = YAML().load(open(task_path + "/cfg.yaml", 'r'))
+cfg = YAML().load(open(task_path + "/dagger_cfg.yaml", 'r'))
 
 
 # create environment from the configuration file
-env = VecEnv(quadcopter_imitation.RaisimGymEnv(home_path + "/../rsc", dump(cfg['environment'], Dumper=RoundTripDumper)),
+env = VecEnv(quadcopter_RL.RaisimGymEnv(home_path + "/../rsc", dump(cfg['environment'], Dumper=RoundTripDumper)),
              cfg['environment'], normalize_ob=False)
 
 
@@ -62,13 +62,12 @@ ob_dim_learner = ob_dim_expert - 4
 act_dim = env.num_acts
 obs = np.zeros((env.num_envs, ob_dim_learner), dtype="float32")
 
-init_state = np.zeros(shape=(env.num_envs, ob_dim_expert), dtype="float32")
-for i in range(len(init_state)):
-    init_state[i][2] = 0.135
-    init_state[i][3] = 1
-    init_state[i][7] = 1
-    init_state[i][11] = 1
-    init_state[i][18] = 1
+init_state = np.zeros(shape=(1, ob_dim_expert), dtype="float32")
+init_state[0][2] = 0.135
+init_state[0][3] = 1
+init_state[0][7] = 1
+init_state[0][11] = 1
+init_state[0][18] = 1
 
 # Training param
 n_steps = math.floor(cfg['environment']['max_time'] / cfg['environment']['control_dt'])
@@ -79,7 +78,8 @@ total_steps = n_steps * env.num_envs
 expert = PID(2.8, 20, 6, ob_dim_expert, act_dim, cfg['environment']['control_dt'], 1.727)
 expert_actions = np.zeros(shape=(env.num_envs, act_dim), dtype="float32")
 targets = np.zeros(shape=(env.num_envs, ob_dim_expert), dtype="float32")
-last_targets = targets.copy()
+vis_target = np.zeros(shape=(1, ob_dim_expert), dtype="float32")
+env_target = np.zeros(shape=(env.num_envs, act_dim), dtype="float32")
 
 # Actor and Critic
 actor = module.Actor(module.MLP(cfg['architecture']['policy_net'],
@@ -150,11 +150,21 @@ for update in range(2000):
         env.turn_off_visualization()
     update += last_update
 
+    """adjust single visualizable env target to all envs. 
+    Why this way? -> writing another python wrapper takes too much effort. The visualized env[0] creates a random 
+    target, which is extracted via a C++->Python interface - in this case env.observe(). To apply the random target to 
+    all envs, the target will be given to the otehr envs as an action with the only Python->C++ interface 
+    env.step(action). In the Environment.hpp file, the in the step method the action (here: target of env[0]) can be set 
+    as the target of all envs."""
     expert_obs = env.observe()
-    targets = init_state - expert_obs.copy()
-    if update % 10 == 0:
-        learner.scheduler.step(epoch=-1)
-    print(targets)
+    vis_target = init_state - expert_obs[0]
+    for i in range(len(targets)):
+        targets[i] = vis_target
+        env_target[i] = vis_target[0][0:4]
+
+    _, _ = env.step(env_target)
+    expert_obs = env.observe()
+
 
     """ Evaluation and saving of the models """
     if update % cfg['environment']['eval_every_n'] == 0:
@@ -183,6 +193,7 @@ for update in range(2000):
 
                 # separate and expert obs with dim 21 and (normalized) learner obs with dim 18
                 learner_obs = expert_obs.copy()
+                expert_obs += targets
                 for i in range(0, env.num_envs):
                     obs[i] = learner_obs[i][0:18]
                 obs = helper.normalize_observation(obs)
@@ -211,10 +222,10 @@ for update in range(2000):
             env.reset()
 
 
-    # set target point: target point is randomly defined in Environment.hpp
 
 
     """ Actual training """
+
     for step in range(n_steps):
         # visualize while training
         #env.turn_on_visualization()

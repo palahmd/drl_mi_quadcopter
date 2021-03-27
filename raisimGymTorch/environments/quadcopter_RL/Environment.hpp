@@ -25,7 +25,7 @@ namespace raisim {
                     resourceDir_ + "/ITM-quadcopter/urdf/ITM-quadcopter.urdf");
             robot_->setName("Quaddy");
             robot_->setIntegrationScheme(raisim::ArticulatedSystem::IntegrationScheme::RUNGE_KUTTA_4);
-            world_->addGround(-10);
+            world_->addGround(-15);
 
             /// get robot data
             gcDim_ = robot_->getGeneralizedCoordinateDim();
@@ -47,7 +47,7 @@ namespace raisim {
 
             /// nominal configuration of quadcopter: [0]-[2]: center of mass, [3]-[6]: quanternions, [7]-[10]: rotors
             gc_init_ << 0.0, 0.0, 0.135, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
-            gv_init_ << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1000 * rpm_, 1000 * rpm_, -1000 * rpm_, 1000 * rpm_;
+            gv_init_ << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -2000 * rpm_, 2000 * rpm_, -2000 * rpm_, 2000 * rpm_;
 
             /// initialize rotor thrusts_ and conversion matrix for generated forces and torques
             thrusts_.setZero(nRotors_);
@@ -82,58 +82,38 @@ namespace raisim {
         void init() final {}
 
         void reset() final {
-            /// set random target point
-            /*
-            if (loopCount_ == 0){
-                double spawnChance = generateRandomValue(0,1);
-                if (spawnChance > 0.5){
-                    gc_init_[2] = 0.135;
-                }
-                else{
-                    gc_init_[2] = 10.135;
-                }
-                targetPoint_[0] = generateRandomValue(-10, 10);
-                targetPoint_[1] = generateRandomValue(-10, 10);
-                targetPoint_[2] = generateRandomValue(2.5, 7.5);
-            }
-            loopCount_++;
-            if (loopCount_ == 10) loopCount_ = 0;
-            */
-            float dummy;
-            do{
-                for (int i=0; i<3; i++){
-                    gc_init_(i) = generateRandomValue(-1, 1);
-                }
-                for (int i=0; i<4; i++){
-                    gc_init_(i+3) = generateRandomValue(-1, 1);
-                }
-                gc_.segment(3,4) /= gc_.segment(3,4).norm();
-                for (int i=0; i<3; i++){
-                    gv_init_(i) = generateRandomValue(-1, 1);
-                }
-                for (int i=0; i<3; i++){
-                    gv_init_(i+3) = generateRandomValue(-1, 1);
-                }
-            } while( isTerminalState(dummy) );
+            /// set random target point or state
+            setNRandomTargets(10, 10);
 
             robot_->setState(gc_init_, gv_init_);
-
-            if (visualizable_){
-                server_->focusOn(robot_);
-                visPoint->setPosition(targetPoint_.head(3));
-            }
-            raisim::MSLEEP(0.5);
             updateObservation();
-            raisim::MSLEEP(0.5);
+
+            if (visualizable_) server_->focusOn(robot_);
         }
 
         float step(const Eigen::Ref<EigenVec> &action) final {
+            /*** If setSingleRandomTarget() is used, uncomment this if-loop. the runner file will take the target from
+             ** the single vis. environment with env.observe() and hand over the random target to all n env via a dummy
+             ** env.step(action). action is in this case a numpy vector containing n-times the single random target. The
+             ** following loop is then executed a single time to set the random target for all n environments. **/
+            if (singleRandomTarget) {
+                if (loopCount_ == 0) {
+                    targetPoint_.head(3) = action.head(3).cast<double>();
+                    loopCount_ = 1;
+
+                    robot_->setState(gc_init_, gv_init_);
+                    updateObservation();
+
+                    return 0.f;
+                }
+            }
+
+            /// scale action down to [-1, 1]. should work better than clipping, does at least for the pid controller
             controlThrusts_ = action.cast<double>();
 
             double max_scale = controlThrusts_.maxCoeff();
             double min_scale = controlThrusts_.minCoeff();
 
-            /// scale action down to [-1, 1]. should work better than clipping, does at least for the pid controller
             if ((max_scale > 1) || (min_scale < - 1)) {
                 if (std::abs(min_scale) < std::abs(max_scale)) {
                     controlThrusts_ /= max_scale;
@@ -142,22 +122,21 @@ namespace raisim {
                     controlThrusts_ /= min_scale;
                 }
             }
+
+            /// normedControlThrust_ is used for the reward function
             normedControlThrusts_ = controlThrusts_;
 
-            /// scale bounded action input to thrusts
+            /// scale bounded action input to actual rotor thrusts
             controlThrusts_ = controlThrusts_.cwiseProduct(actionStd_);
             controlThrusts_ += actionMean_;
-            //thrusts_ = controlThrusts_;
-
-            /// apply simple motor delay model with rotor delay
-
-            // apply thrust
-
 
             for (int i = 0; i < int(control_dt_ / simulation_dt_ + 1e-10); i++) {
                 if (server_) server_->lockVisualizationServerMutex();
+                /// apply rotor thrusts
                 applyThrusts();
                 world_->integrate();
+
+                /// delay rotor thrusts with a simple motor model
                 for (int i = 0; i<4; i++){
                     if (thrusts_[i]<controlThrusts_[i]) {  // time constant for increasing rotor speed
                         thrusts_[i] = thrusts_[i] + (controlThrusts_[i] - thrusts_[i]) * simulation_dt_ / 0.0125;
@@ -165,25 +144,16 @@ namespace raisim {
                         thrusts_[i] = thrusts_[i] + (controlThrusts_[i] - thrusts_[i]) * simulation_dt_ / 0.025;
                     }
                 }
+
                 if (server_) server_->unlockVisualizationServerMutex();
             }
 
             updateObservation();
 
-            relativeAbsPosition = std::sqrt((targetPoint_.head(3) - bodyPos_).norm());
-
-            if (relativeAbsPosition < 0.6){
-                relPositionReward = 1 - (1/0.6) * relativeAbsPosition;
-            }
-            else{
-                relPositionReward = 0;
-            }
-
-            rewards_.record("position", relativeAbsPosition);
-            rewards_.record("relPosition", relPositionReward);
-            rewards_.record("thrust", normedControlThrusts_.norm());
-            rewards_.record("orientation", std::acos(bodyRot_(2,1)));
-            rewards_.record("angularVelocity", bodyAngVel_.norm());
+            rewards_.record("position", std::sqrt((targetPoint_.head(3) - bodyPos_).transpose() * (targetPoint_.head(3) - bodyPos_)));
+            rewards_.record("thrust", normedControlThrusts_.mean());
+            rewards_.record("orientation", std::abs(eulerAngles_(2)));
+            rewards_.record("angularVelocity", std::abs(bodyAngVel_.mean()));
 
             return rewards_.sum();
         }
@@ -198,31 +168,122 @@ namespace raisim {
             bodyLinVel_ = bodyRot_ * gv_.segment(0,3);
             bodyAngVel_ = bodyRot_ * gv_.segment(3,3);
             robot_->getBaseOrientation(quat_);
-            //calculateEulerAngles();
+            calculateEulerAngles();
 
             /// observation vector (later for RL-Algorithm)
             for (size_t i = 0; i < 3; i++) {
                 obDouble_[i] = bodyPos_[i];
             }
 
-            // World Frame rotation Matrix and quaternion: obDouble_[9]-obDouble_[17], ob_q[9]-ob_q[12]
             for (size_t i = 0; i < 3; i++) {
                 for (size_t j = 0; j<3; j++){
                     obDouble_[j + (i+1)*3] = bodyRot_(i,j);
                 }
             }
 
-            // body velocities: obDouble_[3]-obDouble_[5], ob_q[3]-ob_q[5]
             for (size_t i = 0; i < 3; i++) {
                 obDouble_[i + 12] = bodyLinVel_[i];
             }
-            // body angular velocities: obDouble_[6]-obDouble_[8], ob_q[6]-ob_q[8]
+
             for (size_t i = 0; i < 3; i++) {
                 obDouble_[i + 15] = bodyAngVel_[i];
             }
 
+            // quaternion is used for the pid controller
             for (size_t i = 0; i < 4; i++) {
                 obDouble_[i + 18] = quat_[i];
+            }
+        }
+
+        void observe(Eigen::Ref<EigenVec> ob) final {
+            /// convert it to float
+            obDouble_ -= targetPoint_;
+            ob = obDouble_.cast<float>();
+        }
+
+        bool isTerminalState(float& terminalReward) final {
+            terminalReward = float(terminalRewardCoeff_);
+
+            for(auto& contact: robot_->getContacts()) {
+                if (bodyIndices_.find(contact.getlocalBodyIndex()) == bodyIndices_.end()) {
+                    /// prevents the random target to change too early; return true will call reset() and change loopCount_
+                    if (nRandomTargets) loopCount_--;
+                    if (singleRandomTarget) loopCount_++;
+                    return true;
+                }
+            }
+
+            if (std::abs((gc_.head(3)).mean()) > 30){
+                if (nRandomTargets) loopCount_--;
+                if (singleRandomTarget) loopCount_++;
+                return true;
+            }
+
+            terminalReward = 0.f;
+            return false;
+        }
+
+
+        /********* Custom functions **********/
+
+        void applyThrusts(){
+            /// calculate Forces and Torques
+            torquesAndForces_ = thrusts2TorquesAndForces_ * thrusts_;
+            forces_baseFrame_ << 0.0, 0.0, torquesAndForces_(0);
+            torques_baseFrame_ = torquesAndForces_.tail(3);
+
+            torques_worldFrame_.e() = worldRot_.e() * torques_baseFrame_;
+            forces_worldFrame_.e() = worldRot_.e() * forces_baseFrame_;
+
+            genForces_.head(3) = forces_worldFrame_.e();
+            genForces_.segment(3,3) = torques_worldFrame_.e();
+            robot_->setGeneralizedForce(genForces_);
+
+            /// this option will visualize the applied forces and torques
+            // robot_->setExternalForce(0, forces_worldFrame_);
+            // robot_->setExternalTorque(0, torques_worldFrame_);
+        }
+
+        void setSingleRandomTarget(double radius){
+            /// target will be updated everytime environment is reset
+            if (visualizable_) {
+                for(int i =0; i>3, i++) targetPoint_[i] = generateRandomValue(-1, 1);
+                targetPoint_.head(3) /= targetPoint_.norm() * radius; // target point has distance of 10 m within a sphere
+                visPoint->setPosition(targetPoint_.head(3));
+            }
+            loopCount_ = 0;
+            singleRandomTarget = True;
+        }
+
+        void setNRandomTargets(double radius, int updateRate){
+            if (loopCount_ == 0){
+                for(int i =0; i>3, i++) targetPoint_[i] = generateRandomValue(-1, 1);
+                targetPoint_.head(3) /= targetPoint_.norm() * radius; // target point has distance of 10 m within a sphere
+
+                if (visualizable_) visPoint->setPosition(targetPoint_.head(3));
+            }
+
+            /// update target after specific amount of environment resets
+            loopCount_++;
+            if (loopCount_ == updateRate) loopCount_ = 0;
+            nRandomTargets = True;
+        }
+
+        void setRandomState(double pos, bool rot, double vel, double angVel){
+            for (int i=0; i<3; i++){
+                gc_init_(i) = generateRandomValue(-pos, pos);
+            }
+            if (rot) {
+                for (int i = 0; i < 4; i++) {
+                    gc_init_(i + 3) = generateRandomValue(-1, 1);
+                }
+                gc_.segment(3, 4) /= gc_.segment(3, 4).norm();
+            }
+            for (int i=0; i<3; i++){
+                gv_init_(i) = generateRandomValue(-vel, vel);
+            }
+            for (int i=0; i<3; i++){
+                gv_init_(i+3) = generateRandomValue(-angVel, angVel);
             }
         }
 
@@ -233,6 +294,7 @@ namespace raisim {
 
             return distr(eng);
         }
+
         void calculateEulerAngles(){
             double sinr_cosp = 2 * (quat_[0] * quat_[1] + quat_[2] * quat_[3]);
             double cosr_cosp = 1 - 2 * (quat_[1] * quat_[1] + quat_[2] * quat_[2]);
@@ -252,46 +314,6 @@ namespace raisim {
             eulerAngles_[2] = std::atan2(siny_cosp, cosy_cosp);
         }
 
-
-        void observe(Eigen::Ref<EigenVec> ob) final {
-            /// convert it to float
-            obDouble_ -= targetPoint_;
-            ob = obDouble_.cast<float>();
-        }
-
-        void applyThrusts(){
-            /// calculate Forces and Torques
-            torquesAndForces_ = thrusts2TorquesAndForces_ * thrusts_;
-            forces_baseFrame_ << 0.0, 0.0, torquesAndForces_(0);
-            torques_baseFrame_ = torquesAndForces_.tail(3);
-
-            torques_worldFrame_.e() = worldRot_.e() * torques_baseFrame_;
-            forces_worldFrame_.e() = worldRot_.e() * forces_baseFrame_;
-
-            genForces_.head(3) = forces_worldFrame_.e();
-            genForces_.segment(3,3) = torques_worldFrame_.e();
-            robot_->setGeneralizedForce(genForces_);
-
-            /// this will visualize the applied forces and torques
-            // robot_->setExternalForce(0, forces_worldFrame_);
-            // robot_->setExternalTorque(0, torques_worldFrame_);
-        }
-        bool isTerminalState(float& terminalReward) final {
-            terminalReward = float(terminalRewardCoeff_);
-
-            /*
-            for(auto& contact: robot_->getContacts()) {
-                if (bodyIndices_.find(contact.getlocalBodyIndex()) == bodyIndices_.end())
-                    return true;
-            }
-
-            if (std::abs((gc_.head(3)).mean()) > 30){
-                return true;
-            }*/
-
-            terminalReward = 0.f;
-            return false;
-        }
 
         raisim::Mat<3,3> worldRot_;
         raisim::Vec<4> quat_;
@@ -313,8 +335,6 @@ namespace raisim {
         const double g_ = 9.81, m_ = 1.727;
         const double hoverThrust_ = m_ * g_ / 4;
         int loopCount_ = 0;
-        double relativeAbsPosition;
-        double relPositionReward;
 
         int gcDim_, gvDim_, nRotors_;
         bool visualizable_ = true;
@@ -328,6 +348,10 @@ namespace raisim {
         std::set<size_t> bodyIndices_;
 
         raisim::Visuals* visPoint;
+
+        /// other variables
+        bool singleRandomTarget = False;
+        bool nRandomTargets = False;
     };
 }
 

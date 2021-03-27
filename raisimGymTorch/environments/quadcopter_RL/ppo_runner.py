@@ -49,11 +49,11 @@ start_date = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 #tensorboard_launcher(saver.data_dir+"/..")  # press refresh (F5) after the first update
 
 # config
-cfg = YAML().load(open(task_path + "/cfg.yaml", 'r'))
+cfg = YAML().load(open(task_path + "/ppo_cfg.yaml", 'r'))
 deterministic_policy = cfg['architecture']['deterministic_policy']
 
 # create environment from the configuration file
-env = VecEnv(quadcopter_reinforcement.RaisimGymEnv(home_path + "/../rsc", dump(cfg['environment'], Dumper=RoundTripDumper)),
+env = VecEnv(quadcopter_RL.RaisimGymEnv(home_path + "/../rsc", dump(cfg['environment'], Dumper=RoundTripDumper)),
              cfg['environment'], normalize_ob=False)
 
 # action and observation space. Learner has 4 values less (quaternions)
@@ -120,14 +120,13 @@ Training Loop
 
 for update in range(1000):
     start = time.time()
-    env.reset()
     reward_ll_sum = 0
     done_sum = 0
     average_dones = 0.
 
     # optional: skip first visualization with update = 1
     if update == 0:
-        update = 1
+        update = 0
     update += last_update
 
     """ Evaluation and saving of the models """
@@ -200,6 +199,7 @@ for update in range(1000):
         obs[i] = full_obs[i][0:18].copy()
     obs = helper.normalize_observation(obs)
 
+    env.reset()
 
     mean_loss = ppo.update(actor_obs=obs,
                value_obs=obs,

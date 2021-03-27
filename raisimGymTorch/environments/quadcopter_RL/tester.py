@@ -1,5 +1,5 @@
 from ruamel.yaml import YAML, dump, RoundTripDumper
-from raisimGymTorch.env.bin import quadcopter_imitation
+from raisimGymTorch.env.bin import quadcopter_RL
 from raisimGymTorch.env.RaisimGymVecEnv import RaisimGymVecEnv as VecEnv
 import raisimGymTorch.algo.shared_modules.actor_critic as module
 from raisimGymTorch.helper.env_helper.env_helper import helper
@@ -28,7 +28,7 @@ cfg = YAML().load(open(task_path + "/cfg.yaml", 'r'))
 # create environment from the configuration file
 cfg['environment']['num_envs'] = 1
 
-env = VecEnv(quadcopter_imitation.RaisimGymEnv(home_path + "/../rsc", dump(cfg['environment'], Dumper=RoundTripDumper)),
+env = VecEnv(quadcopter_RL.RaisimGymEnv(home_path + "/../rsc", dump(cfg['environment'], Dumper=RoundTripDumper)),
              cfg['environment'], normalize_ob=False)
 # shortcuts
 ob_dim_expert = env.num_obs
@@ -55,6 +55,8 @@ if weight_path == "":
 else:
     print("Loaded weight from {}\n".format(weight_path))
     start = time.time()
+    time.sleep(3)
+    env.turn_on_visualization()
     env.reset()
     reward_ll_sum = 0
     done_sum = 0
@@ -71,8 +73,8 @@ else:
 
 
     helper.load_scaling(weight_dir, int(iteration_number))
-    env.reset()
     env.turn_on_visualization()
+    env.reset()
     #env.start_video_recording(datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S") + "test"+'.mp4')
     #time.sleep(2)
     for step in range(n_steps * 2):
