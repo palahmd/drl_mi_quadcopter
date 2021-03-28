@@ -84,7 +84,7 @@ class helper:
 
         mean_csv_path = weight_dir + 'mean' + iteration_number + '.csv'
         var_csv_path = weight_dir + 'var' + iteration_number + '.csv'
-        items_to_save = [weight_path, mean_csv_path, var_csv_path, weight_dir + "cfg.yaml", weight_dir + "Environment.hpp"]
+        items_to_save = [weight_path, mean_csv_path, var_csv_path, weight_dir + "dagger_cfg.yaml", weight_dir + "Environment.hpp"]
 
         if items_to_save is not None:
             pretrained_data_dir = data_dir + '/pretrained_' + weight_path.rsplit('/', 1)[0].rsplit('/', 1)[1]

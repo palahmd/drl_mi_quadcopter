@@ -83,7 +83,7 @@ namespace raisim {
 
         void reset() final {
             /// set random target point or state
-            setNRandomTargets(10, 10);
+            setNRandomTargets(10, 2);
 
             robot_->setState(gc_init_, gv_init_);
             updateObservation();
@@ -252,6 +252,12 @@ namespace raisim {
             /// this option will visualize the applied forces and torques
             // robot_->setExternalForce(0, forces_worldFrame_);
             // robot_->setExternalTorque(0, torques_worldFrame_);
+        }
+
+        void setTarget(double x, double y, double z){
+            targetPoint_[0] = x;
+            targetPoint_[1] = y;
+            targetPoint_[2] = z;
         }
 
         void setSingleRandomTarget(double radius){

@@ -53,11 +53,11 @@ class DAgger:
         self.optimizer = optim.Adam([*self.actor.parameters(), *self.critic.parameters()], lr=min_lr)
 
         if use_lr_scheduler == True:
-            self.scheduler = optim.lr_scheduler.CyclicLR(self.optimizer, base_lr=max_lr, cycle_momentum=False,
-                                                         max_lr=min_lr, step_size_up=10*num_learning_epochs*num_mini_batches,
+            self.scheduler = optim.lr_scheduler.CyclicLR(self.optimizer, base_lr=min_lr, cycle_momentum=False,
+                                                         max_lr=max_lr, step_size_up=0.5*num_learning_epochs*num_mini_batches,
                                                          last_epoch=-1, verbose=False)
-            if last_update != 0:
-                self.scheduler.step(epoch=last_update)
+            #if last_update != 0:
+                #self.scheduler.step(epoch=last_update)
         else:
             self.scheduler = optim.lr_scheduler.StepLR(self.optimizer, step_size=1, gamma=1)
 
@@ -197,9 +197,9 @@ class DAgger:
 
                 if not self.deterministic_policy:
                     act_log_prob_batch, entropy_batch = self.actor.evaluate(actor_obs_batch, expert_actions_batch)
-                    loss = action_log_prob_loss + entropy_loss + l2_reg_loss + value_loss
+                    loss = action_log_prob_loss + entropy_loss + l2_reg_loss
                 else:
-                    loss = action_loss + entropy_loss + l2_reg_loss + value_loss
+                    loss = action_loss + entropy_loss + l2_reg_loss
 
                 self.optimizer.zero_grad()
                 loss.backward()
@@ -215,6 +215,8 @@ class DAgger:
                 mean_advantages += advantages_batch.mean().item()
                 mean_value_loss += value_loss.item()
                 mean_values = values_batch.mean().item()
+
+
 
         num_updates = self.num_learning_epochs * self.num_mini_batches
         mean_loss /= num_updates

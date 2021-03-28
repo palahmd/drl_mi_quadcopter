@@ -62,12 +62,13 @@ ob_dim_learner = ob_dim_expert - 4
 act_dim = env.num_acts
 obs = np.zeros((env.num_envs, ob_dim_learner), dtype="float32")
 
-init_state = np.zeros(shape=(1, ob_dim_expert), dtype="float32")
-init_state[0][2] = 0.135
-init_state[0][3] = 1
-init_state[0][7] = 1
-init_state[0][11] = 1
-init_state[0][18] = 1
+init_state = np.zeros(shape=(cfg['environment']['num_envs'], ob_dim_expert), dtype="float32")
+for i in range(len(init_state)):
+    init_state[i][2] = 0.135
+    init_state[i][3] = 1
+    init_state[i][7] = 1
+    init_state[i][11] = 1
+    init_state[i][18] = 1
 
 # Training param
 n_steps = math.floor(cfg['environment']['max_time'] / cfg['environment']['control_dt'])
@@ -75,7 +76,7 @@ total_steps = n_steps * env.num_envs
 
 
 # Expert: PID Controller and target point
-expert = PID(2.8, 20, 6, ob_dim_expert, act_dim, cfg['environment']['control_dt'], 1.727)
+expert = PID(2.5, 50, 6.5, ob_dim_expert, act_dim, cfg['environment']['control_dt'], 1.727)
 expert_actions = np.zeros(shape=(env.num_envs, act_dim), dtype="float32")
 targets = np.zeros(shape=(env.num_envs, ob_dim_expert), dtype="float32")
 vis_target = np.zeros(shape=(1, ob_dim_expert), dtype="float32")
@@ -143,6 +144,8 @@ for update in range(2000):
 
     # tmeps
     loopCount = 5
+    dones_sum = 0
+    reward_sum = 0
 
     # optional: skip first visualization with update = 1
     if update == 0:
@@ -167,11 +170,12 @@ for update in range(2000):
 
     last_targets = targets.copy()
     expert_obs = env.observe()
-    targets = expert_obs.copy()
+    targets = init_state - expert_obs.copy()
 
     if last_targets[0][0] != targets[0][0]:
-        learner.scheduler.step(epoch=-1)
-        print("scheduler reset")
+    #    learner.scheduler.step(epoch=-1)
+    #    print("scheduler reset")
+        print("new target")
 
     """ Evaluation and saving of the models """
     if update % cfg['environment']['eval_every_n'] == 0:
@@ -189,10 +193,11 @@ for update in range(2000):
             print("Visualizing and evaluating the current policy")
 
             # open raisimUnity and wait until it has started and focused on robot
-            env.turn_on_visualization()
             proc = subprocess.Popen(raisim_unity_Path)
-            time.sleep(7)
+            env.turn_on_visualization()
+            time.sleep(6)
             env.start_video_recording(start_date + "policy_" + str(update) + '.mp4')
+            time.sleep(2)
 
             for step in range(int(n_steps*1.5)):
                 #frame_start = time.time()
@@ -208,7 +213,7 @@ for update in range(2000):
                 action_ll = learner.actor.noiseless_action(torch.from_numpy(obs).to(device))
                 action_ll = helper.limit_action(action_ll)
 
-                _, _ = env.step(action_ll)
+                reward, dones = env.step(action_ll)
                 expert_obs = env.observe()
 
                 # stop simulation for fluent visualization
@@ -217,9 +222,19 @@ for update in range(2000):
                 #if wait_time > 0:
                 #    time.sleep(wait_time)
 
+                dones_sum += sum(dones)
+                reward_sum += sum(reward)
+
                 time.sleep(cfg['environment']['control_dt'])
             env.stop_video_recording()
             env.turn_off_visualization()
+            env.reset()
+            env.observe()
+
+            print('----------------------------------------------------')
+            print('{:<40} {:>6}'.format("average dones: ", '{:0.6f}'.format(dones_sum/total_steps)))
+            print('{:<40} {:>6}'.format("average reward: ", '{:0.6f}'.format(reward_sum/total_steps)))
+            print('----------------------------------------------------\n')
 
             # close raisimUnity to use less ressources
             proc.kill()
@@ -227,12 +242,11 @@ for update in range(2000):
 
 
 
-
     """ Actual training """
 
     for step in range(n_steps):
         # visualize while training
-        #env.turn_on_visualization()
+        env.turn_on_visualization()
 
         # separate and expert obs with dim=21 and (normalized) learner obs with dim=18
         learner_obs = expert_obs.copy()
@@ -255,12 +269,12 @@ for update in range(2000):
 
         # for outter pid-control loop running five times slower
         if loopCount == 5:
-            loopCount = 0
+            loopCount = 1
         loopCount += 1
 
         expert_obs = env.observe()
 
-        #env.turn_off_visualization()
+        env.turn_off_visualization()
 
     learner_obs = expert_obs.copy()
     expert_obs += targets
@@ -276,6 +290,8 @@ for update in range(2000):
 
     print('----------------------------------------------------')
     print('{:>6}th iteration'.format(update))
+    print('{:<40} {:>6}'.format("average dones: ", '{:0.6f}'.format(dones_sum/total_steps)))
+    print('{:<40} {:>6}'.format("average reward: ", '{:0.6f}'.format(reward_sum/total_steps)))
     print('{:<40} {:>6}'.format("beta: ", '{:0.6f}'.format(learner.beta + learner.beta_scheduler)))
     print('{:<40} {:>6}'.format("mean loss: ", '{:0.6f}'.format(mean_loss)))
     print('{:<40} {:>6}'.format("mean action log prob loss: ", '{:0.6f}'.format(mean_action_log_prob_loss)))
