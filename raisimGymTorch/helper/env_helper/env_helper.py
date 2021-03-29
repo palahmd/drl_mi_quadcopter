@@ -73,7 +73,7 @@ class helper:
         self.obs_rms.var = np.loadtxt(var_file_name, dtype=np.float32)
 
 
-    def load_param(self, weight_path, actor, critic, optimizer, scheduler, data_dir):
+    def load_param(self, weight_path, actor, critic, optimizer, scheduler, data_dir, file_name):
 
         if weight_path == "":
             raise Exception("\nCan't find the pre-trained weight, please provide a pre-trained weight with --weight switch\n")
@@ -84,7 +84,9 @@ class helper:
 
         mean_csv_path = weight_dir + 'mean' + iteration_number + '.csv'
         var_csv_path = weight_dir + 'var' + iteration_number + '.csv'
-        items_to_save = [weight_path, mean_csv_path, var_csv_path, weight_dir + "dagger_cfg.yaml", weight_dir + "Environment.hpp"]
+
+        items_to_save = [weight_path, mean_csv_path, var_csv_path, weight_dir +file_name + "cfg.yaml", weight_dir +
+                             "Environment.hpp"]
 
         if items_to_save is not None:
             pretrained_data_dir = data_dir + '/pretrained_' + weight_path.rsplit('/', 1)[0].rsplit('/', 1)[1]
@@ -98,4 +100,4 @@ class helper:
         actor.distribution.load_state_dict(checkpoint['actor_distribution_state_dict'])
         critic.architecture.load_state_dict(checkpoint['critic_architecture_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-        #scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
+        scheduler.load_state_dict(checkpoint['scheduler_state_dict'])

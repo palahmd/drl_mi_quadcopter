@@ -25,7 +25,7 @@ namespace raisim {
                     resourceDir_ + "/ITM-quadcopter/urdf/ITM-quadcopter.urdf");
             robot_->setName("Quaddy");
             robot_->setIntegrationScheme(raisim::ArticulatedSystem::IntegrationScheme::RUNGE_KUTTA_4);
-            world_->addGround(-10);
+            world_->addGround(-15);
 
             /// get robot data
             gcDim_ = robot_->getGeneralizedCoordinateDim();
@@ -47,7 +47,7 @@ namespace raisim {
 
             /// nominal configuration of quadcopter: [0]-[2]: center of mass, [3]-[6]: quanternions, [7]-[10]: rotors
             gc_init_ << 0.0, 0.0, 0.135, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
-            gv_init_ << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1000 * rpm_, 1000 * rpm_, -1000 * rpm_, 1000 * rpm_;
+            gv_init_ << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -2000 * rpm_, 2000 * rpm_, -2000 * rpm_, 2000 * rpm_;
 
             /// initialize rotor thrusts_ and conversion matrix for generated forces and torques
             thrusts_.setZero(nRotors_);
@@ -82,23 +82,13 @@ namespace raisim {
         void init() final {}
 
         void reset() final {
-            /// set random target point
+        /// set random target point
+            targetPoint_[0] = generateRandomValue(-1, 1);
+            targetPoint_[1] = generateRandomValue(-1, 1);
+            targetPoint_[2] = generateRandomValue(-1, 1);
+            targetPoint_.head(3) /= targetPoint_.head(3).norm();
+            targetPoint_.head(3) *= 10;
             /*
-            if (loopCount_ == 0){
-                double spawnChance = generateRandomValue(0,1);
-                if (spawnChance > 0.5){
-                    gc_init_[2] = 0.135;
-                }
-                else{
-                    gc_init_[2] = 10.135;
-                }
-                targetPoint_[0] = generateRandomValue(-10, 10);
-                targetPoint_[1] = generateRandomValue(-10, 10);
-                targetPoint_[2] = generateRandomValue(2.5, 7.5);
-            }
-            loopCount_++;
-            if (loopCount_ == 10) loopCount_ = 0;
-            */
             float dummy;
             do{
                 for (int i=0; i<3; i++){
@@ -114,7 +104,7 @@ namespace raisim {
                 for (int i=0; i<3; i++){
                     gv_init_(i+3) = generateRandomValue(-1, 1);
                 }
-            } while( isTerminalState(dummy) );
+            } while( isTerminalState(dummy) );*/
 
             robot_->setState(gc_init_, gv_init_);
 

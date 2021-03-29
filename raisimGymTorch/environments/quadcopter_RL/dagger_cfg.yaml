@@ -4,7 +4,7 @@ record_video: yes
 environment:
   simulation_dt: 0.002
   control_dt: 0.01
-  max_time: 13.0
+  max_time: 15.0
   render: True
 
   num_envs: 96
@@ -20,7 +20,7 @@ environment:
     thrust:
       coeff: 0.0
     orientation:
-      coeff: -0.0002
+      coeff: 0.0
     angularVelocity:
       coeff: 0.0
 
@@ -50,6 +50,6 @@ hyperparam:
   use_lr_scheduler: True
   max_lr: 0.005
   min_lr: 0.0005 # is the actual learning rate if use_lr_scheduler = False
-  l2_reg_weight: 0.001
+  l2_reg_weight: 0.005
   entropy_weight: 0.0
 

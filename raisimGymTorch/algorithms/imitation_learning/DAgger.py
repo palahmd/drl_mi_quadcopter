@@ -56,10 +56,10 @@ class DAgger:
             self.scheduler = optim.lr_scheduler.CyclicLR(self.optimizer, base_lr=min_lr, cycle_momentum=False,
                                                          max_lr=max_lr, step_size_up=0.5*num_learning_epochs*num_mini_batches,
                                                          last_epoch=-1, verbose=False)
-            #if last_update != 0:
-                #self.scheduler.step(epoch=last_update)
+            if last_update != 0:
+                self.scheduler.step(epoch=last_update*num_learning_epochs*num_mini_batches)
         else:
-            self.scheduler = optim.lr_scheduler.StepLR(self.optimizer, step_size=1, gamma=1)
+            self.scheduler = optim.lr_scheduler.StepLR(self.optimizer, step_size=1000, gamma=1)
 
         self.beta_goal = beta
         self.beta = 1

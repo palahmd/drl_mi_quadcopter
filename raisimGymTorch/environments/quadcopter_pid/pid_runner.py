@@ -25,27 +25,36 @@ env = VecEnv(quadcopter_pid.RaisimGymEnv(home_path + "/../rsc", dump(cfg['enviro
 # shortcuts
 ob_dim = env.num_obs
 act_dim = env.num_acts
-target_point = np.array([5.0, 5.0, 5.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]).reshape((12, 1))
+#target_point = np.array([5.0, 5.0, 5.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]).reshape((12, 1))
+target_point = np.zeros(shape=(1, ob_dim), dtype="float32")
+init_state = np.zeros(shape=(1, ob_dim), dtype="float32")
+init_state[0][2] = 0.135
+init_state[0][3] = 1
+init_state[0][7] = 1
+init_state[0][11] = 1
+init_state[0][18] = 1
 
 # Training
 n_steps = math.floor(cfg['environment']['max_time'] / cfg['environment']['control_dt'])
 total_steps = n_steps * env.num_envs
 
-pid = PID(2.5, 50, 6.2, ob_dim, act_dim, cfg['environment']['control_dt'], 1.727)
+pid = PID(3, 50, 6.5, ob_dim, act_dim, cfg['environment']['control_dt'], 1.727)
 
 for update in range(1000000):
     env.reset()
     env.turn_on_visualization()
-    loopCount = 5
+    loopCount = 1
     time.sleep(0.5)
+    obs = env.observe()
+    target_point = init_state - obs
 
     for step in range(n_steps):
         frame_start = time.time()
-        obs = env.observe(update_mean=True)
-
-        action = pid.control(obs=obs.reshape((22, 1)), target=target_point, loopCount=loopCount)
+        obs += target_point
+        action = pid.control(obs=obs.reshape((22, 1)), target=target_point[0][0:12].reshape(12,1), loopCount=loopCount)
 
         _, _ = env.step(action)
+        obs = env.observe()
 
         if loopCount == 5:
             loopCount = 0

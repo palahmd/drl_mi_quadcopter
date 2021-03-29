@@ -83,7 +83,7 @@ namespace raisim {
 
         void reset() final {
             /// set random target point or state
-            setNRandomTargets(10, 2);
+            setNRandomTargets(10, 5);
 
             robot_->setState(gc_init_, gv_init_);
             updateObservation();

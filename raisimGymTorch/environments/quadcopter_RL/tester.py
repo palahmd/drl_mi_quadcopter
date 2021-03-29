@@ -23,7 +23,7 @@ home_path = os.path.dirname(os.path.realpath(__file__)) + "/../.."
 task_path = os.path.dirname(os.path.realpath(__file__))
 
 # config
-cfg = YAML().load(open(task_path + "/cfg.yaml", 'r'))
+cfg = YAML().load(open(task_path + "/dagger_cfg.yaml", 'r'))
 
 # create environment from the configuration file
 cfg['environment']['num_envs'] = 1
