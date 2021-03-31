@@ -18,7 +18,7 @@ fi
 
 ### Link all the algorithm, environments and helper files to raisimGymTorch
 cd ..
-this_path=`pwd`
+home_path=`pwd`
 echo "Linking algorithm, environments and helper files to raisimGymTorch"
 
 # algorithms
@@ -28,7 +28,7 @@ do
 	dir=${dir##*/}
 	
 	mkdir -p $RSG_PATH/raisimGymTorch/algo/$dir
-	ln -s $this_path/algorithms/$dir/* $RSG_PATH/raisimGymTorch/algo/$dir
+	ln -s $home_path/algorithms/$dir/* $RSG_PATH/raisimGymTorch/algo/$dir
 done
 
 # environments
@@ -38,7 +38,7 @@ do
 	dir=${dir##*/}
 	
 	mkdir -p $RSG_PATH/raisimGymTorch/env/envs/$dir
-	ln -s $this_path/environments/$dir/* $RSG_PATH/raisimGymTorch/env/envs/$dir
+	ln -s $home_path/environments/$dir/* $RSG_PATH/raisimGymTorch/env/envs/$dir
 done
 
 # helper
@@ -48,10 +48,10 @@ do
 	dir=${dir##*/}
 	
 	mkdir -p $RSG_PATH/raisimGymTorch/helper/$dir
-	ln -s $this_path/helper/$dir/* $RSG_PATH/raisimGymTorch/helper/$dir
+	ln -s $home_path/helper/$dir/* $RSG_PATH/raisimGymTorch/helper/$dir
 done
 
 # Link raisimUnity for linux to current folder
-ln -s $RSG_PATH/../raisimUnity/linux $this_path/../raisimUnity
+ln -s $RSG_PATH/../raisimUnity/linux $home_path/raisimUnity
 
 echo "Done - ready to compile and run"
