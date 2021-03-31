@@ -1,5 +1,5 @@
 from ruamel.yaml import YAML, dump, RoundTripDumper
-from raisimGymTorch.env.bin import quadcopter_RL
+from raisimGymTorch.env.bin import itm_quadcopter
 from raisimGymTorch.env.RaisimGymVecEnv import RaisimGymVecEnv as VecEnv
 from raisimGymTorch.algo.pid_controller.pid_controller import PID
 from raisimGymTorch.algo.imitation_learning.DAgger import DAgger
@@ -47,20 +47,22 @@ saver = ConfigurationSaver(log_dir=home_path + "/training/imitation_learning",
                            save_items=[task_path + "/dagger_cfg.yaml", task_path + "/Environment.hpp"])
 start_date = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 tensorboard_launcher(saver.data_dir + "/..")  # press refresh (F5) after the first ppo update
+skip_eval = False
 
 # config and config related options
 cfg = YAML().load(open(task_path + "/" + file_name + "cfg.yaml", 'r'))
 cfg['record'] = 'no'
 cfg['environment']['render'] = False  # train environment should not be rendered
 eval_cfg = YAML().load(open(task_path + "/" + file_name + "cfg.yaml", 'r'))
-eval_cfg['environment']['num_envs'] = 1
 
 # create environment and evaluation environment from the configuration file
-env = VecEnv(quadcopter_RL.RaisimGymEnv(home_path + "/../rsc", dump(cfg['environment'], Dumper=RoundTripDumper)),
+env = VecEnv(itm_quadcopter.RaisimGymEnv(home_path + "/../rsc", dump(cfg['environment'], Dumper=RoundTripDumper)),
              cfg['environment'], normalize_ob=False)
 eval_env = VecEnv(
-    quadcopter_RL.RaisimGymEnv(home_path + "/../rsc", dump(eval_cfg['environment'], Dumper=RoundTripDumper)),
+    itm_quadcopter.RaisimGymEnv(home_path + "/../rsc", dump(eval_cfg['environment'], Dumper=RoundTripDumper)),
     eval_cfg['environment'], normalize_ob=False)
+env.turn_off_visualization()
+eval_env.turn_off_visualization()
 
 # observation and action dim
 ob_dim_expert = env.num_obs  # expert has 4 additional values for quaternions
@@ -73,7 +75,7 @@ n_steps = math.floor(cfg['environment']['max_time'] / cfg['environment']['contro
 total_steps = n_steps * env.num_envs
 
 # Expert: PID Controller, target point and initial state to calculate target point
-expert = PID(3, 50, 6.5, ob_dim_expert, act_dim, cfg['environment']['control_dt'], 1.727)
+expert = PID(2.5, 50, 6.5, ob_dim_expert, act_dim, cfg['environment']['control_dt'], 1.727)
 expert_actions = np.zeros(shape=(env.num_envs, act_dim), dtype="float32")
 targets = np.zeros(shape=(env.num_envs, ob_dim_expert), dtype="float32")
 vis_target = np.zeros(shape=(1, ob_dim_expert), dtype="float32")
@@ -143,16 +145,17 @@ Training Loop
 for update in range(2000):
     env.reset()
     start = time.time()
+    #env.turn_on_visualization()
 
     # tmeps
-    loopCount = 1
+    loopCount = 0
     dones_sum = 0
     reward_sum = 0
 
     # optional: skip first visualization with update = 1
     if update == 0:
-        update = 0
-        env.turn_off_visualization()
+        update -= 1
+        skip_eval = True
     update += last_update
 
     """adjust single visualizable env target to all envs. 
@@ -197,7 +200,7 @@ for update in range(2000):
             # open raisimUnity and wait until it has started and focused on robot
             proc = subprocess.Popen(raisim_unity_Path)
             eval_env.turn_on_visualization()
-            for i in range(10):
+            for i in range(10): # reset 10 times to make sure that target point is changed
                 eval_env.reset()
             time.sleep(6)
             eval_env.start_video_recording(start_date + "policy_" + str(update) + '.mp4')
@@ -240,8 +243,8 @@ for update in range(2000):
             print('----------------------------------------------------\n')
 
     """ Actual training """
-
     for step in range(n_steps):
+
         # separate and expert obs with dim=21 and (normalized) learner obs with dim=18
         learner_obs = expert_obs.copy()
         expert_obs += targets
@@ -265,8 +268,10 @@ for update in range(2000):
         reward_sum += sum(reward)
 
         # for outter pid-control loop running five times slower
-        if loopCount == 5:
+        if loopCount == 8:
             loopCount = 0
+            if step >= n_steps/4:
+                loopCount = 3
         loopCount += 1
 
         expert_obs = env.observe()
@@ -276,6 +281,9 @@ for update in range(2000):
         obs[i] = learner_obs[i][0:18]
     obs = helper.normalize_observation(obs)
 
+    if skip_eval:
+        update += 1
+        skip_eval = False
     mean_loss, mean_action_loss, mean_action_log_prob_loss, mean_value_loss = learner.update(obs=obs,
                                                                                              log_this_iteration=update % 10 == 0,
                                                                                              update=update)

@@ -2,13 +2,13 @@ seed: 1
 record_video: yes
 
 environment:
-  simulation_dt: 0.001
+  simulation_dt: 0.002
   control_dt: 0.01
-  max_time: 15.0
+  max_time: 13.0
   render: True
 
   num_envs: 1
-  eval_every_n: 40
+  eval_every_n: 20
   visualize_eval: True
   num_threads: 40
 

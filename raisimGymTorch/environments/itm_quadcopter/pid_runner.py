@@ -1,5 +1,5 @@
 from ruamel.yaml import YAML, dump, RoundTripDumper
-from raisimGymTorch.env.bin import quadcopter_pid
+from raisimGymTorch.env.bin import itm_quadcopter
 from raisimGymTorch.env.RaisimGymVecEnv import RaisimGymVecEnv as VecEnv
 import os
 import math
@@ -12,14 +12,18 @@ import torch
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 # directories
+file_name = ""
+if len(os.path.basename(__file__).split("_", 1)) != 1:
+    for i in range(len(os.path.basename(__file__).split("_", 1)) - 1):
+        file_name += os.path.basename(__file__).split("_", 1)[0] + "_"
 home_path = os.path.dirname(os.path.realpath(__file__)) + "/../.."
 task_path = os.path.dirname(os.path.realpath(__file__))
 
 # config
-cfg = YAML().load(open(task_path + "/cfg.yaml", 'r'))
+cfg = YAML().load(open(task_path + "/" + file_name + "cfg.yaml", 'r'))
 
 # create environment from the configuration file
-env = VecEnv(quadcopter_pid.RaisimGymEnv(home_path + "/../rsc", dump(cfg['environment'], Dumper=RoundTripDumper)),
+env = VecEnv(itm_quadcopter.RaisimGymEnv(home_path + "/../rsc", dump(cfg['environment'], Dumper=RoundTripDumper)),
              cfg['environment'], normalize_ob=False)
 
 # shortcuts
@@ -38,12 +42,12 @@ init_state[0][18] = 1
 n_steps = math.floor(cfg['environment']['max_time'] / cfg['environment']['control_dt'])
 total_steps = n_steps * env.num_envs
 
-pid = PID(3, 50, 6.5, ob_dim, act_dim, cfg['environment']['control_dt'], 1.727)
+pid = PID(2.8, 50, 6.5, ob_dim, act_dim, cfg['environment']['control_dt'], 1.727)
 
 for update in range(1000000):
     env.reset()
     env.turn_on_visualization()
-    loopCount = 1
+    loopCount = 8
     time.sleep(0.5)
     obs = env.observe()
     target_point = init_state - obs
@@ -55,9 +59,10 @@ for update in range(1000000):
 
         _, _ = env.step(action)
         obs = env.observe()
-
-        if loopCount == 5:
-            loopCount = 0
+        
+        # frequency of outter PID acceleration controller
+        if loopCount >= 8:
+            loopCount = 3
         loopCount += 1
 
         frame_end = time.time()

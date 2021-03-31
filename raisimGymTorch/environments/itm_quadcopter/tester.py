@@ -26,7 +26,7 @@ task_path = os.path.dirname(os.path.realpath(__file__))
 cfg = YAML().load(open(task_path + "/dagger_cfg.yaml", 'r'))
 
 # create environment from the configuration file
-cfg['environment']['num_envs'] = 1
+#cfg['environment']['num_envs'] = 1
 
 env = VecEnv(quadcopter_RL.RaisimGymEnv(home_path + "/../rsc", dump(cfg['environment'], Dumper=RoundTripDumper)),
              cfg['environment'], normalize_ob=False)
@@ -34,7 +34,7 @@ env = VecEnv(quadcopter_RL.RaisimGymEnv(home_path + "/../rsc", dump(cfg['environ
 ob_dim_expert = env.num_obs
 ob_dim_learner = ob_dim_expert - 4
 act_dim = env.num_acts
-obs = np.zeros((1, ob_dim_learner), dtype="float32")
+obs = np.zeros((cfg['environment']['num_envs'], ob_dim_learner), dtype="float32")
 
 weight_path = args.weight
 weight_dir = weight_path.rsplit('/', 1)[0] + '/'
@@ -80,7 +80,7 @@ else:
     for step in range(n_steps * 2):
         frame_start = time.time()
         learner_obs = env.observe()
-        for i in range(0, env.num_envs):
+        for i in range(env.num_envs):
             obs[i] = learner_obs[i][0:18].copy()
         obs = helper.normalize_observation(obs)
 
@@ -90,7 +90,7 @@ else:
 
         reward_ll, dones = env.step(action_ll)
         reward_ll_sum = reward_ll_sum + reward_ll[0]
-        done_sum += dones
+        done_sum += sum(dones)
 
         frame_end = time.time()
         wait_time = cfg['environment']['control_dt'] - (frame_end-frame_start)
@@ -98,10 +98,10 @@ else:
          #   time.sleep(wait_time)
         time.sleep(cfg['environment']['control_dt'])
 
-        if dones or step == (n_steps*2 - 1):
+        if sum(dones) >= 1 or step == (n_steps*2 - 1):
             print('----------------------------------------------------')
             print('{:<40} {:>6}'.format("average ll reward: ", '{:0.10f}'.format(reward_ll_sum / (step + 1 - start_step_id))))
- #           print('{:<40} {:>6}'.format("average ll reward: ", '{:0.10f}'.format(done_sum)))
+            print('{:<40} {:>6}'.format("average ll reward: ", '{:0.10f}'.format(done_sum)))
             print('{:<40} {:>6}'.format("time elapsed [sec]: ", '{:6.4f}'.format((step + 1 - start_step_id) * 0.01)))
             print('----------------------------------------------------\n')
             start_step_id = step + 1

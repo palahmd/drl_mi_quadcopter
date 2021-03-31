@@ -1,5 +1,5 @@
 from ruamel.yaml import YAML, dump, RoundTripDumper
-from raisimGymTorch.env.bin import quadcopter_reinforcement
+from raisimGymTorch.env.bin import itm_quadcopter
 from raisimGymTorch.algo.reinforcement_learning.ppo import PPO
 from raisimGymTorch.env.RaisimGymVecEnv import RaisimGymVecEnv as VecEnv
 from raisimGymTorch.helper.raisim_gym_helper import ConfigurationSaver, load_param, tensorboard_launcher
@@ -38,22 +38,26 @@ weight_path = args.weight
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 # directories
+file_name = ""
+if len(os.path.basename(__file__).split("_", 1)) != 1:
+    for i in range(len(os.path.basename(__file__).split("_", 1)) - 1):
+        file_name += os.path.basename(__file__).split("_", 1)[0] + "_"  # for dagger_runner.py -> file_name = dagger_
 home_path = os.path.dirname(os.path.realpath(__file__)) + "/../.."
 task_path = os.path.dirname(os.path.realpath(__file__))
 raisim_unity_Path = home_path + "/raisimUnity/raisimUnity.x86_64"
 
 # logging
-saver = ConfigurationSaver(log_dir=home_path + "/training/ppo",
-                           save_items=[task_path + "/cfg.yaml", task_path + "/Environment.hpp", task_path + "/ppo_runner.py"])
+saver = ConfigurationSaver(log_dir=home_path + "/training/imitation_learning",
+                           save_items=[task_path + "/dagger_cfg.yaml", task_path + "/Environment.hpp"])
 start_date = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 #tensorboard_launcher(saver.data_dir+"/..")  # press refresh (F5) after the first update
 
 # config
-cfg = YAML().load(open(task_path + "/ppo_cfg.yaml", 'r'))
+cfg = YAML().load(open(task_path + "/" + file_name + "cfg.yaml", 'r'))
 deterministic_policy = cfg['architecture']['deterministic_policy']
 
 # create environment from the configuration file
-env = VecEnv(quadcopter_RL.RaisimGymEnv(home_path + "/../rsc", dump(cfg['environment'], Dumper=RoundTripDumper)),
+env = VecEnv(itm_quadcopter.RaisimGymEnv(home_path + "/../rsc", dump(cfg['environment'], Dumper=RoundTripDumper)),
              cfg['environment'], normalize_ob=False)
 
 # action and observation space. Learner has 4 values less (quaternions)
@@ -107,7 +111,7 @@ helper = helper(env=env, num_obs=ob_dim_learner,
 
 
 if mode == 'retrain':
-    load_param(weight_path, env, actor, critic, ppo.optimizer, saver.data_dir)
+    helper.load_param(weight_path, actor, critic, ppo.optimizer, ppo.scheduler, saver.data_dir, file_name)
     last_update = int(weight_path.rsplit('/', 1)[1].split('_', 1)[1].rsplit('.', 1)[0])
     helper.load_scaling(weight_path, last_update)
 else:

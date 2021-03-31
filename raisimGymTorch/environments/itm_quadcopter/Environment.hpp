@@ -83,7 +83,8 @@ namespace raisim {
 
         void reset() final {
             /// set random target point or state
-            setNRandomTargets(10, 5);
+            setNRandomTargets(10, 10);
+            //setTarget(5.77, 5.77, 5.77);
 
             robot_->setState(gc_init_, gv_init_);
             updateObservation();
@@ -203,6 +204,9 @@ namespace raisim {
             for (size_t i = 0; i < 4; i++) {
                 obDouble_[i + 18] = quat_[i];
             }
+            for (size_t i = 0; i < obDim_; i++){
+                obDouble_[i] *= (1 + generateNoise(0, 0.01));
+            }
         }
 
         void observe(Eigen::Ref<EigenVec> ob) final {
@@ -258,6 +262,7 @@ namespace raisim {
             targetPoint_[0] = x;
             targetPoint_[1] = y;
             targetPoint_[2] = z;
+            if (visualizable_) visPoint->setPosition(targetPoint_.head(3));
         }
 
         void setSingleRandomTarget(double radius){
@@ -308,12 +313,20 @@ namespace raisim {
             }
         }
 
-        double generateRandomValue(int MIN, int MAX){
+        double generateRandomValue(double MIN, double MAX){
             std::random_device rd;
             std::default_random_engine eng(rd());
-            std::uniform_real_distribution<double> distr(MIN, MAX);
+            std::uniform_real_distribution<double> distribution(MIN, MAX);
 
-            return distr(eng);
+            return distribution(eng);
+        }
+
+        double generateNoise(double mean, double std){
+            std::random_device rd;
+            std::default_random_engine eng(rd());
+            std::normal_distribution<double> distribution(mean, std);
+
+            return distribution(eng);
         }
 
         void calculateEulerAngles(){

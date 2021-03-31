@@ -4,7 +4,7 @@ record_video: yes
 environment:
   simulation_dt: 0.002
   control_dt: 0.01
-  max_time: 15.0
+  max_time: 14.0
   render: True
 
   num_envs: 96
@@ -40,16 +40,16 @@ helper:
 
 
 hyperparam:
-  num_mini_batches: 6
+  num_mini_batches: 4
   num_learning_epochs: 50
   shuffle: False # True should give better sample efficiency
   Gamma: 0.995
   init_beta: 1.0
-  Beta: 0.7
+  Beta: 0.6
   beta_scheduler: 0.001
-  use_lr_scheduler: True
-  max_lr: 0.005
-  min_lr: 0.0005 # is the actual learning rate if use_lr_scheduler = False
+  use_lr_scheduler: False
+  max_lr: 0.004
+  min_lr: 0.001 # is the actual learning rate if use_lr_scheduler = False
   l2_reg_weight: 0.005
   entropy_weight: 0.0
 

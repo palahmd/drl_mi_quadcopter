@@ -54,7 +54,7 @@ class DAgger:
 
         if use_lr_scheduler == True:
             self.scheduler = optim.lr_scheduler.CyclicLR(self.optimizer, base_lr=min_lr, cycle_momentum=False,
-                                                         max_lr=max_lr, step_size_up=0.5*num_learning_epochs*num_mini_batches,
+                                                         max_lr=max_lr, step_size_up=2*num_mini_batches,
                                                          last_epoch=-1, verbose=False)
             if last_update != 0:
                 self.scheduler.step(epoch=last_update*num_learning_epochs*num_mini_batches)
@@ -175,6 +175,7 @@ class DAgger:
         mean_advantages = 0
         mean_value_loss = 0
         mean_values = 0
+        test = 0
         for epoch in range(self.num_learning_epochs):
             for actor_obs_batch, expert_obs_batch, critic_obs_batch, actions_batch, expert_actions_batch, target_values_batch, \
                 advantages_batch, returns_batch, old_actions_log_prob_batch \
@@ -215,8 +216,9 @@ class DAgger:
                 mean_advantages += advantages_batch.mean().item()
                 mean_value_loss += value_loss.item()
                 mean_values = values_batch.mean().item()
+                test += 1
 
-
+        print(test)
 
         num_updates = self.num_learning_epochs * self.num_mini_batches
         mean_loss /= num_updates
