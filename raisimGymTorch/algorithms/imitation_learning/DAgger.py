@@ -1,4 +1,4 @@
-from .DAgger_storage import RolloutStorage
+from .dagger_storage import RolloutStorage
 from datetime import datetime
 from torch.utils.tensorboard import SummaryWriter
 import torch
@@ -51,15 +51,20 @@ class DAgger:
         self.num_mini_batches = num_mini_batches
         self.num_learning_epochs = num_learning_epochs
         self.optimizer = optim.Adam([*self.actor.parameters(), *self.critic.parameters()], lr=min_lr)
+        self.use_lr_scheduler = use_lr_scheduler
 
-        if use_lr_scheduler == True:
-            self.scheduler = optim.lr_scheduler.CyclicLR(self.optimizer, base_lr=min_lr, cycle_momentum=False,
-                                                         max_lr=max_lr, step_size_up=2*num_mini_batches,
+        if self.use_lr_scheduler == True:
+            self.min_lr = min_lr
+            self.max_lr = max_lr
+            self.scheduler = optim.lr_scheduler.CyclicLR(self.optimizer, base_lr=self.min_lr, cycle_momentum=False,
+                                                         max_lr=self.max_lr, step_size_up=2*self.num_mini_batches,
                                                          last_epoch=-1, verbose=False)
+
             if last_update != 0:
                 self.scheduler.step(epoch=last_update*num_learning_epochs*num_mini_batches)
         else:
             self.scheduler = optim.lr_scheduler.StepLR(self.optimizer, step_size=1000, gamma=1)
+
 
         self.beta_goal = beta
         self.beta = 1
@@ -153,10 +158,18 @@ class DAgger:
         if self.beta <= self.beta_goal:
             self.beta = self.beta_goal
             self.beta_scheduler = -abs(self.beta_scheduler)
+            if self.use_lr_scheduler:
+                self.scheduler = optim.lr_scheduler.CyclicLR(self.optimizer, base_lr=self.min_lr/2, cycle_momentum=False
+                                                         , max_lr=self.max_lr/2, step_size_up=2*self.num_mini_batches,
+                                                         last_epoch=-1, verbose=False)
 
         if self.beta >= (1):
             self.beta = 1
             self.beta_scheduler = abs(self.beta_scheduler)
+            if self.use_lr_scheduler:
+                self.scheduler = optim.lr_scheduler.CyclicLR(self.optimizer, base_lr=self.min_lr/4, cycle_momentum=False
+                                                         , max_lr=self.max_lr/4, step_size_up=2*self.num_mini_batches,
+                                                         last_epoch=-1, verbose=False)
 
         self.beta -= self.beta_scheduler
 

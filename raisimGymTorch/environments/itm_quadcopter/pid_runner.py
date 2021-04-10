@@ -42,7 +42,7 @@ init_state[0][18] = 1
 n_steps = math.floor(cfg['environment']['max_time'] / cfg['environment']['control_dt'])
 total_steps = n_steps * env.num_envs
 
-pid = PID(2.8, 50, 6.5, ob_dim, act_dim, cfg['environment']['control_dt'], 1.727)
+pid = PID(2.8, 20, 6.5, ob_dim, act_dim, cfg['environment']['control_dt'], 1.727)
 
 for update in range(1000000):
     env.reset()

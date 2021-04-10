@@ -1,2 +1,2 @@
-from .DAgger import DAgger
-from .DAgger_storage import RolloutStorage
+from .dagger import DAgger
+from .dagger_storage import RolloutStorage

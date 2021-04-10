@@ -26,8 +26,8 @@ environment:
 
 
 architecture:
-  policy_net: [64, 64]
-  value_net: [64, 64]
+  policy_net: [128, 128]
+  value_net: [128, 128]
   activation_fn: nn.LeakyReLU
   deterministic_policy: False # if True: does not converge, because action loss will be used instead of log prob action loss
                               # False: loss = -logProb
@@ -45,11 +45,11 @@ hyperparam:
   shuffle: False # True should give better sample efficiency
   Gamma: 0.995
   init_beta: 1.0
-  Beta: 0.6
+  Beta: 0.85
   beta_scheduler: 0.001
   use_lr_scheduler: False
-  max_lr: 0.004
-  min_lr: 0.001 # is the actual learning rate if use_lr_scheduler = False
+  max_lr: 0.0015
+  min_lr: 0.0005 # is the actual learning rate if use_lr_scheduler = False
   l2_reg_weight: 0.005
   entropy_weight: 0.0
 

@@ -73,7 +73,7 @@ class helper:
         self.obs_rms.var = np.loadtxt(var_file_name, dtype=np.float32)
 
 
-    def load_param(self, weight_path, actor, critic, optimizer, scheduler, data_dir, file_name):
+    def load_param(self, weight_path, actor, critic, optimizer, data_dir, file_name):
 
         if weight_path == "":
             raise Exception("\nCan't find the pre-trained weight, please provide a pre-trained weight with --weight switch\n")
@@ -100,4 +100,4 @@ class helper:
         actor.distribution.load_state_dict(checkpoint['actor_distribution_state_dict'])
         critic.architecture.load_state_dict(checkpoint['critic_architecture_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-        scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
+        #scheduler.load_state_dict(checkpoint['scheduler_state_dict'])

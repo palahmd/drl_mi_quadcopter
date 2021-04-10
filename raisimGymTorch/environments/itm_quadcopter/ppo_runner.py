@@ -54,11 +54,19 @@ start_date = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 
 # config
 cfg = YAML().load(open(task_path + "/" + file_name + "cfg.yaml", 'r'))
+cfg['record'] = 'no'
+cfg['environment']['render'] = False  # train environment should not be rendered
+eval_cfg = YAML().load(open(task_path + "/" + file_name + "cfg.yaml", 'r'))
 deterministic_policy = cfg['architecture']['deterministic_policy']
 
 # create environment from the configuration file
 env = VecEnv(itm_quadcopter.RaisimGymEnv(home_path + "/../rsc", dump(cfg['environment'], Dumper=RoundTripDumper)),
              cfg['environment'], normalize_ob=False)
+eval_env = VecEnv(
+    itm_quadcopter.RaisimGymEnv(home_path + "/../rsc", dump(eval_cfg['environment'], Dumper=RoundTripDumper)),
+    eval_cfg['environment'], normalize_ob=False)
+env.turn_off_visualization()
+eval_env.turn_off_visualization()
 
 # action and observation space. Learner has 4 values less (quaternions)
 ob_dim_expert = env.num_obs # expert has 4 additional values for quaternions
@@ -111,7 +119,7 @@ helper = helper(env=env, num_obs=ob_dim_learner,
 
 
 if mode == 'retrain':
-    helper.load_param(weight_path, actor, critic, ppo.optimizer, ppo.scheduler, saver.data_dir, file_name)
+    helper.load_param(weight_path, actor, critic, ppo.optimizer, saver.data_dir, file_name)
     last_update = int(weight_path.rsplit('/', 1)[1].split('_', 1)[1].rsplit('.', 1)[0])
     helper.load_scaling(weight_path, last_update)
 else:
@@ -123,14 +131,16 @@ Training Loop
 
 
 for update in range(1000):
+    env.reset()
     start = time.time()
-    reward_ll_sum = 0
-    done_sum = 0
+    reward_sum = 0
+    dones_sum = 0
     average_dones = 0.
 
     # optional: skip first visualization with update = 1
     if update == 0:
-        update = 0
+        update -= 1
+        skip_eval = True
     update += last_update
 
     """ Evaluation and saving of the models """
@@ -141,7 +151,8 @@ for update in range(1000):
             'actor_distribution_state_dict': actor.distribution.state_dict(),
             'critic_architecture_state_dict': critic.architecture.state_dict(),
             'optimizer_state_dict': ppo.optimizer.state_dict(),
-        }, saver.data_dir+"/full_"+str(update)+'.pt')
+            #'scheduler_state_dict': learner.scheduler.state_dict(),
+        }, saver.data_dir + "/full_" + str(update) + '.pt')
         helper.save_scaling(saver.data_dir, str(update))
 
         if cfg['environment']['visualize_eval']:
@@ -149,33 +160,48 @@ for update in range(1000):
 
             # open raisimUnity and wait until it has started and focused on robot
             proc = subprocess.Popen(raisim_unity_Path)
-            time.sleep(7)
-            env.reset()
-            env.turn_on_visualization()
-            env.start_video_recording(start_date + "policy_" + str(update) + '.mp4')
+            eval_env.turn_on_visualization()
+            for i in range(10): # reset 10 times to make sure that target point is changed
+                eval_env.reset()
+            time.sleep(6)
+            eval_env.start_video_recording(start_date + "policy_" + str(update) + '.mp4')
+            time.sleep(2)
 
-            for step in range(int(n_steps*1.5)):
-                full_obs = env.observe()
-                for i in range(0, env.num_envs):
-                    obs[i] = full_obs[i][0:18].copy()
+            # load another graph to evaluate on the evaluation environment, so the loop inside the training environment
+            # will not be falsified by the evaluation
+            loaded_graph = module.MLP(cfg['architecture']['policy_net'], eval(cfg['architecture']['activation_fn']),
+                                      ob_dim_learner, act_dim)
+            loaded_graph.load_state_dict(
+                torch.load(saver.data_dir + "/full_" + str(update) + '.pt')['actor_architecture_state_dict'])
+
+            for step in range(int(n_steps * 1.5)):
+                # separate and expert obs with dim 21 and (normalized) learner obs with dim 18
+                full_obs = eval_env.observe()
+                obs[0] = full_obs[0][0:18].copy()
                 obs = helper.normalize_observation(obs)
 
-                action_ll = ppo.actor.noiseless_action(torch.from_numpy(obs).to(device))
+                # limit action either by clipping or scaling
+                action_ll = loaded_graph.architecture(torch.from_numpy(obs).cpu())
                 action_ll = helper.limit_action(action_ll)
 
-                _, _ = env.step(action_ll)
+                reward, dones = eval_env.step(action_ll)
+
+                # stop simulation for fluent visualization
+                dones_sum += sum(dones)
+                reward_sum += sum(reward)
 
                 time.sleep(cfg['environment']['control_dt'])
+            eval_env.stop_video_recording()
+            eval_env.turn_off_visualization()
 
-            env.stop_video_recording()
-            env.turn_off_visualization()
-
-            # close raisimUnity to use less resources
+            # close raisimUnity to use less ressources
             proc.kill()
-            #os.kill(proc.pid+1, signal.SIGKILL)
+            # os.kill(proc.pid+1, signal.SIGKILL) # if proc.kill() does not work
 
-            env.reset()
-
+            print('----------------------------------------------------')
+            print('{:<40} {:>6}'.format("average dones: ", '{:0.6f}'.format(dones_sum)))
+            print('{:<40} {:>6}'.format("average reward: ", '{:0.6f}'.format(reward_sum)))
+            print('----------------------------------------------------\n')
 
     # actual training
     for step in range(n_steps):
@@ -192,8 +218,8 @@ for update in range(1000):
         reward, dones = env.step(action)
 
         ppo.step(value_obs=obs, rews=reward, dones=dones)
-        done_sum = done_sum + sum(dones)
-        reward_ll_sum = reward_ll_sum + sum(reward)
+        dones_sum = dones_sum + sum(dones)
+        reward_sum = reward_sum + sum(reward)
 
         #env.turn_on_visualization()
 
@@ -203,7 +229,9 @@ for update in range(1000):
         obs[i] = full_obs[i][0:18].copy()
     obs = helper.normalize_observation(obs)
 
-    env.reset()
+    if skip_eval:
+        update += 1
+        skip_eval = False
 
     mean_loss = ppo.update(actor_obs=obs,
                value_obs=obs,
@@ -212,8 +240,8 @@ for update in range(1000):
 
     end = time.time()
 
-    average_ll_performance = reward_ll_sum / total_steps
-    average_dones = done_sum / total_steps
+    average_ll_performance = reward_sum / total_steps
+    average_dones = dones_sum / total_steps
     avg_rewards.append(average_ll_performance)
 
     actor.distribution.enforce_minimum_std((torch.ones(4)).to(device))
@@ -221,7 +249,7 @@ for update in range(1000):
     print('----------------------------------------------------')
     print('{:>6}th iteration'.format(update))
     print('{:<40} {:>6}'.format("average ll reward: ", '{:0.10f}'.format(average_ll_performance)))
-    print('{:<40} {:>6}'.format("total reward: ", '{:0.10f}'.format(reward_ll_sum)))
+    print('{:<40} {:>6}'.format("total reward: ", '{:0.10f}'.format(reward_sum)))
     print('{:<40} {:>6}'.format("dones: ", '{:0.6f}'.format(average_dones)))
     print('{:<40} {:>6}'.format("mean loss: ", '{:0.6f}'.format(mean_loss)))
     print('{:<40} {:>6}'.format("time elapsed in this iteration: ", '{:6.4f}'.format(end - start)))

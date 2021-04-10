@@ -2,7 +2,7 @@ from ruamel.yaml import YAML, dump, RoundTripDumper
 from raisimGymTorch.env.bin import itm_quadcopter
 from raisimGymTorch.env.RaisimGymVecEnv import RaisimGymVecEnv as VecEnv
 from raisimGymTorch.algo.pid_controller.pid_controller import PID
-from raisimGymTorch.algo.imitation_learning.DAgger import DAgger
+from raisimGymTorch.algo.imitation_learning.dagger import DAgger
 from raisimGymTorch.helper.raisim_gym_helper import ConfigurationSaver, tensorboard_launcher
 from raisimGymTorch.helper.env_helper.env_helper import helper
 import raisimGymTorch.algo.shared_modules.actor_critic as module
@@ -43,7 +43,7 @@ home_path = task_path + "/../.."
 raisim_unity_Path = home_path + "/raisimUnity/raisimUnity.x86_64"
 
 # logging
-saver = ConfigurationSaver(log_dir=home_path + "/training/imitation_learning",
+saver = ConfigurationSaver(log_dir=home_path + "/training/dagger",
                            save_items=[task_path + "/dagger_cfg.yaml", task_path + "/Environment.hpp"])
 start_date = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 tensorboard_launcher(saver.data_dir + "/..")  # press refresh (F5) after the first ppo update
@@ -134,7 +134,7 @@ helper = helper(env=env, num_obs=ob_dim_learner,
 learner.beta = cfg['hyperparam']['init_beta']
 
 if mode == 'retrain':
-    helper.load_param(weight_path, actor, critic, learner.optimizer, learner.scheduler, saver.data_dir, file_name)
+    helper.load_param(weight_path, actor, critic, learner.optimizer, saver.data_dir, file_name)
     helper.load_scaling(weight_path, last_update)
     learner.beta = cfg['hyperparam']['init_beta'] - learner.beta_scheduler * last_update
 
