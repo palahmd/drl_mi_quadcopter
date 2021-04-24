@@ -1,5 +1,5 @@
 from ruamel.yaml import YAML, dump, RoundTripDumper
-from raisimGymTorch.env.bin import quadcopter_RL
+from raisimGymTorch.env.bin import itm_quadcopter
 from raisimGymTorch.env.RaisimGymVecEnv import RaisimGymVecEnv as VecEnv
 import raisimGymTorch.algo.shared_modules.actor_critic as module
 from raisimGymTorch.helper.env_helper.env_helper import helper
@@ -28,7 +28,7 @@ cfg = YAML().load(open(task_path + "/dagger_cfg.yaml", 'r'))
 # create environment from the configuration file
 #cfg['environment']['num_envs'] = 1
 
-env = VecEnv(quadcopter_RL.RaisimGymEnv(home_path + "/../rsc", dump(cfg['environment'], Dumper=RoundTripDumper)),
+env = VecEnv(itm_quadcopter.RaisimGymEnv(home_path + "/../rsc", dump(cfg['environment'], Dumper=RoundTripDumper)),
              cfg['environment'], normalize_ob=False)
 # shortcuts
 ob_dim_expert = env.num_obs
@@ -74,7 +74,8 @@ else:
 
     helper.load_scaling(weight_dir, int(iteration_number))
     env.turn_on_visualization()
-    env.reset()
+    for i in range(10):
+        env.reset()
     #env.start_video_recording(datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S") + "test"+'.mp4')
     #time.sleep(2)
     for step in range(n_steps * 2):
@@ -89,7 +90,7 @@ else:
 
 
         reward_ll, dones = env.step(action_ll)
-        reward_ll_sum = reward_ll_sum + reward_ll[0]
+        reward_ll_sum = reward_ll_sum + sum(reward_ll)
         done_sum += sum(dones)
 
         frame_end = time.time()
@@ -100,7 +101,7 @@ else:
 
         if sum(dones) >= 1 or step == (n_steps*2 - 1):
             print('----------------------------------------------------')
-            print('{:<40} {:>6}'.format("average ll reward: ", '{:0.10f}'.format(reward_ll_sum / (step + 1 - start_step_id))))
+            print('{:<40} {:>6}'.format("average ll reward: ", '{:0.10f}'.format(reward_ll_sum / cfg['environment']['num_envs'])))
             print('{:<40} {:>6}'.format("average ll reward: ", '{:0.10f}'.format(done_sum)))
             print('{:<40} {:>6}'.format("time elapsed [sec]: ", '{:6.4f}'.format((step + 1 - start_step_id) * 0.01)))
             print('----------------------------------------------------\n')

@@ -89,18 +89,23 @@ for i in range(len(init_state)):
     init_state[i][18] = 1
 
 # Actor and Critic
-actor = module.Actor(module.MLP(cfg['architecture']['policy_net'],
-                                eval(cfg['architecture']['activation_fn']),
-                                ob_dim_learner,
-                                act_dim),
-                     module.MultivariateGaussianDiagonalCovariance(act_dim, 1.0),
-                     device=device)
+if cfg['architecture']['shared_nets']:
+    actor_critic_module = module.sharedBaseNetMLP(cfg['architecture']['base_net'], cfg['architecture']['policy_net'],
+                                                  cfg['architecture']['value_net'],
+                                                  eval(cfg['architecture']['activation_fn']), ob_dim_learner,
+                                                  [act_dim, 1])
+    actor_module = actor_critic_module
+    critic_module = actor_critic_module
+else:
+    actor_module = module.MLP(cfg['architecture']['policy_net'], eval(cfg['architecture']['activation_fn']),
+                              ob_dim_learner, act_dim)
+    critic_module = module.MLP(cfg['architecture']['policy_net'], eval(cfg['architecture']['activation_fn']),
+                               ob_dim_learner, 1)
 
-critic = module.Critic(module.MLP(cfg['architecture']['value_net'],
-                                  eval(cfg['architecture']['activation_fn']),
-                                  ob_dim_learner,
-                                  1),
-                       device=device)
+actor = module.Actor(actor_module, module.MultivariateGaussianDiagonalCovariance(act_dim, 1.0), device=device,
+                     shared_nets=cfg['architecture']['shared_nets'])
+
+critic = module.Critic(critic_module, device=device, shared_nets=cfg['architecture']['shared_nets'])
 
 if mode == 'retrain':
     last_update = int(weight_path.rsplit('/', 1)[1].split('_', 1)[1].rsplit('.', 1)[0])
