@@ -50,8 +50,13 @@ class DAgger:
         # Training parameters
         self.num_mini_batches = num_mini_batches
         self.num_learning_epochs = num_learning_epochs
-        self.optimizer = optim.Adam([*self.actor.parameters(), *self.critic.parameters()], lr=min_lr)
         self.use_lr_scheduler = use_lr_scheduler
+
+        if self.deterministic_policy:
+            self.optimizer = optim.Adam([*self.actor.deterministic_parameters(),
+                                         *self.critic.parameters()], lr=min_lr)
+        else:
+            self.optimizer = optim.Adam([*self.actor.parameters(), *self.critic.parameters()], lr=min_lr)
 
         if self.use_lr_scheduler == True:
             self.min_lr = min_lr
@@ -154,7 +159,6 @@ class DAgger:
                 self.expert_chosen[i][0] = True
 
     def adjust_beta(self):
-
         if self.beta <= self.beta_goal:
             self.beta = self.beta_goal
             self.beta_scheduler = -abs(self.beta_scheduler)
@@ -224,7 +228,7 @@ class DAgger:
                 mean_action_loss += action_loss.item()
                 mean_action_log_prob_loss += action_log_prob_loss.item()
                 mean_entropy_loss += -entropy_batch.mean().item()
-                mean_l2_reg_loss += l2_reg_norm.item()
+                mean_l2_reg_loss += l2_reg_norm
                 mean_returns += returns_batch.mean().item()
                 mean_advantages += advantages_batch.mean().item()
                 mean_value_loss += value_loss.item()

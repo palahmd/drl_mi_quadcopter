@@ -45,19 +45,27 @@ total_steps = n_steps * env.num_envs
 pid = PID(2.8, 20, 6.5, ob_dim, act_dim, cfg['environment']['control_dt'], 1.727)
 
 for update in range(1000000):
-    env.reset()
+    for i in range(10):
+        env.reset()
     env.turn_on_visualization()
     loopCount = 8
     time.sleep(0.5)
     obs = env.observe()
     target_point = init_state - obs
 
+    reward_ll_sum = 0
+    done_sum = 0
+    average_dones = 0.
+
     for step in range(n_steps):
         frame_start = time.time()
         obs += target_point
         action = pid.control(obs=obs.reshape((22, 1)), target=target_point[0][0:12].reshape(12,1), loopCount=loopCount)
 
-        _, _ = env.step(action)
+        reward_ll, dones = env.step(action)
+        reward_ll_sum = reward_ll_sum + reward_ll[0]
+        done_sum += sum(dones)
+
         obs = env.observe()
         
         # frequency of outter PID acceleration controller
@@ -70,5 +78,12 @@ for update in range(1000000):
         wait_time = cfg['environment']['control_dt'] - (frame_end - frame_start)
         if wait_time > 0.:
             time.sleep(wait_time)
+
+    print('----------------------------------------------------')
+    print('{:<40} {:>6}'.format("average ll reward: ", '{:0.10f}'.format(reward_ll_sum)))
+    print('{:<40} {:>6}'.format("average ll reward: ", '{:0.10f}'.format(done_sum)))
+    print('----------------------------------------------------\n')
+    start_step_id = step + 1
+    reward_ll_sum = 0.0
 
 env.turn_off_visualization()

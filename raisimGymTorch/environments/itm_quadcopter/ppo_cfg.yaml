@@ -8,7 +8,7 @@ environment:
   render: True
 
   num_envs: 96
-  eval_every_n: 5
+  eval_every_n: 50
   visualize_eval: True
   num_threads: 40
 
@@ -16,7 +16,7 @@ environment:
     position:
       coeff: -0.002
     relPosition:
-      coeff: 0.002
+      coeff: 0.001
     thrust:
       coeff: 0.0 # maybe not a good choice
     orientation:
@@ -38,13 +38,13 @@ helper:
   clip_action: False # either scale or clip action to [-1, 1]. Also works fine.
 
 hyperparam:
-  num_mini_batches: 4
-  num_learning_epochs: 8
+  num_mini_batches: 3
+  num_learning_epochs: 16
   shuffle: False
-  Gamma: 0.995
+  Gamma: 0.998
   Lambda: 0.95
   clip_param: 0.2
-  learning_rate: 0.01
+  learning_rate: 0.0005
   value_loss_coef: 0.5
   use_clipped_value_loss: True # if True: PPO2, False: PPO
   entropy_coef: 0.0

@@ -71,11 +71,7 @@ class PPO:
 
     def observe(self, actor_obs):
         self.actor_obs = actor_obs
-
-        if not self.deterministic_policy:
-            self.actions = self.actor.noiseless_action(torch.from_numpy(actor_obs).to(self.device))
-        else:
-            self.actions, self.actions_log_prob = self.actor.sample(torch.from_numpy(actor_obs).to(self.device))
+        self.actions = self.actor.noiseless_action(torch.from_numpy(actor_obs).to(self.device))
         # self.actions = np.clip(self.actions.numpy(), self.env.action_space.low, self.env.action_space.high)
         return self.actions
 
@@ -138,6 +134,10 @@ class PPO:
                                                                                    1.0 + self.clip_param)
                 surrogate_loss = torch.max(surrogate, surrogate_clipped).mean()
 
+                l2_reg = [torch.sum(torch.square(w)) for w in self.actor.parameters() and self.critic.parameters()]
+                l2_reg_norm = sum(l2_reg) / 2
+                l2_reg_loss = l2_reg_norm * 0.005
+
                 # Value function loss
                 if self.use_clipped_value_loss:
                     value_clipped = target_values_batch + (value_batch - target_values_batch).clamp(-self.clip_param,
@@ -148,7 +148,8 @@ class PPO:
                 else:
                     value_loss = (returns_batch - value_batch).pow(2).mean()
 
-                loss = surrogate_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy_batch.mean()
+                loss = surrogate_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy_batch.mean() + \
+                       l2_reg_loss
 
                 # Gradient step
                 self.optimizer.zero_grad()
