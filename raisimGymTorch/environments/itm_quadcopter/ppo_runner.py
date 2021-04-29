@@ -50,7 +50,7 @@ raisim_unity_Path = home_path + "/raisimUnity/raisimUnity.x86_64"
 saver = ConfigurationSaver(log_dir=home_path + "/training/imitation_learning",
                            save_items=[task_path + "/dagger_cfg.yaml", task_path + "/Environment.hpp"])
 start_date = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-#tensorboard_launcher(saver.data_dir+"/..")  # press refresh (F5) after the first update
+tensorboard_launcher(saver.data_dir+"/..")  # press refresh (F5) after the first update
 
 # config
 cfg = YAML().load(open(task_path + "/" + file_name + "cfg.yaml", 'r'))
@@ -119,7 +119,7 @@ helper = helper(env=env, num_obs=ob_dim_learner,
 
 
 if mode == 'retrain':
-    helper.load_param(weight_path, actor, critic, ppo.optimizer, saver.data_dir, file_name)
+    helper.load_param(weight_path, actor, critic, ppo, saver.data_dir, file_name)
     last_update = int(weight_path.rsplit('/', 1)[1].split('_', 1)[1].rsplit('.', 1)[0])
     helper.load_scaling(weight_path, last_update)
 else:
@@ -202,6 +202,9 @@ for update in range(1000):
             print('{:<40} {:>6}'.format("average dones: ", '{:0.6f}'.format(dones_sum)))
             print('{:<40} {:>6}'.format("average reward: ", '{:0.6f}'.format(reward_sum)))
             print('----------------------------------------------------\n')
+
+            reward_sum = 0
+            dones_sum = 0
 
     # actual training
     for step in range(n_steps):

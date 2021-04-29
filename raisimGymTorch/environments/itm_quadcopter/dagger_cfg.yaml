@@ -4,19 +4,19 @@ record_video: yes
 environment:
   simulation_dt: 0.002
   control_dt: 0.01
-  max_time: 14.0
+  max_time: 15.0
   render: True
 
   num_envs: 96
-  eval_every_n: 20
+  vis_every_n: 20
   visualize_eval: True
-  num_threads: 30
+  num_threads: 40
 
   reward:
     position:
       coeff: -0.002
     relPosition:
-      coeff: 0.002
+      coeff: 0.0
     thrust:
       coeff: 0.0
     orientation:
@@ -26,10 +26,10 @@ environment:
 
 
 architecture:
-  shared_nets: True
-  base_net: [128]
-  policy_net: [64]
-  value_net: [64]
+  shared_nets: False
+  base_net: [64]
+  policy_net: [64, 64]
+  value_net: [64, 64]
   activation_fn: nn.LeakyReLU
   deterministic_policy: False # if True: does not converge, because action loss will be used instead of log prob action loss
                               # False: loss = -logProb
@@ -44,14 +44,14 @@ helper:
 hyperparam:
   num_mini_batches: 4
   num_learning_epochs: 50
-  shuffle: False # True should give better sample efficiency
+  shuffle: True # True should give better sample efficiency
   Gamma: 0.995
   init_beta: 1.0
-  Beta: 0.85
-  beta_scheduler: 0.001
-  use_lr_scheduler: False
-  max_lr: 0.0015
-  min_lr: 0.0005 # is the actual learning rate if use_lr_scheduler = False
+  Beta: 0.
+  beta_scheduler: 0.002
+  use_lr_scheduler: True
+  max_lr: 0.0025
+  min_lr: 0.001 # is the actual learning rate if use_lr_scheduler = False
   l2_reg_weight: 0.005
   entropy_weight: 0.0
 

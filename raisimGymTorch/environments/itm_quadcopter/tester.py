@@ -68,8 +68,13 @@ else:
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     print("Visualizing and evaluating the policy: ", weight_path)
-    loaded_graph = module.MLP(cfg['architecture']['policy_net'], eval(cfg['architecture']['activation_fn']), ob_dim_learner, act_dim)
-    loaded_graph.load_state_dict(torch.load(weight_path.rsplit('/', 1)[0]+"/full_"+str(iteration_number)+'.pt')['actor_architecture_state_dict'])
+    if cfg['architecture']['shared_nets']:
+        loaded_graph = module.sharedBaseNetMLP(cfg['architecture']['base_net'], cfg['architecture']['policy_net'], cfg['architecture']['value_net'],
+                                               eval(cfg['architecture']['activation_fn']), ob_dim_learner, [act_dim,1])
+        loaded_graph.load_state_dict(torch.load(weight_path.rsplit('/', 1)[0]+"/full_"+str(iteration_number)+'.pt')['actor_architecture_state_dict'])
+    else:
+        loaded_graph = module.MLP(cfg['architecture']['policy_net'], eval(cfg['architecture']['activation_fn']), ob_dim_learner, act_dim)
+        loaded_graph.load_state_dict(torch.load(weight_path.rsplit('/', 1)[0]+"/full_"+str(iteration_number)+'.pt')['actor_architecture_state_dict'])
 
 
     helper.load_scaling(weight_dir, int(iteration_number))
@@ -85,28 +90,29 @@ else:
             obs[i] = learner_obs[i][0:18].copy()
         obs = helper.normalize_observation(obs)
 
-        action_ll = loaded_graph.architecture(torch.from_numpy(obs))
+        if cfg['architecture']['shared_nets']:
+            action_ll = loaded_graph.actor_net(torch.from_numpy(obs))
+        else:
+            action_ll = loaded_graph.architecture(torch.from_numpy(obs))
         action_ll = helper.limit_action(action_ll)
 
 
         reward_ll, dones = env.step(action_ll)
-        reward_ll_sum = reward_ll_sum + sum(reward_ll)
+        reward_ll_sum += sum(reward_ll)
         done_sum += sum(dones)
 
         frame_end = time.time()
         wait_time = cfg['environment']['control_dt'] - (frame_end-frame_start)
-        #if wait_time > 0:
-         #   time.sleep(wait_time)
-        time.sleep(cfg['environment']['control_dt'])
+        if wait_time > 0:
+            time.sleep(wait_time)
+        #time.sleep(cfg['environment']['control_dt'])
 
-        if sum(dones) >= 1 or step == (n_steps*2 - 1):
+        if sum(dones) >= 1 or step == (n_steps*2 -1):
             print('----------------------------------------------------')
-            print('{:<40} {:>6}'.format("average ll reward: ", '{:0.10f}'.format(reward_ll_sum / cfg['environment']['num_envs'])))
-            print('{:<40} {:>6}'.format("average ll reward: ", '{:0.10f}'.format(done_sum)))
+            print('{:<40} {:>6}'.format("total reward: ", '{:0.10f}'.format(reward_ll_sum)))
+            print('{:<40} {:>6}'.format("dones: ", '{:0.10f}'.format(done_sum)))
             print('{:<40} {:>6}'.format("time elapsed [sec]: ", '{:6.4f}'.format((step + 1 - start_step_id) * 0.01)))
             print('----------------------------------------------------\n')
-            start_step_id = step + 1
-            reward_ll_sum = 0.0
 
     env.stop_video_recording()
     env.turn_off_visualization()
