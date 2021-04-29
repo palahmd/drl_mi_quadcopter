@@ -16,6 +16,7 @@ class RolloutStorage:
         # For PPO
         self.actions_log_prob = torch.zeros(num_transitions_per_env, num_envs, 1).to(self.device)
         self.values = torch.zeros(num_transitions_per_env, num_envs, 1).to(self.device)
+        self.action_values = torch.zeros(num_transitions_per_env, num_envs, 1).to(self.device)
         self.returns = torch.zeros(num_transitions_per_env, num_envs, 1).to(self.device)
         self.advantages = torch.zeros(num_transitions_per_env, num_envs, 1).to(self.device)
 
@@ -45,18 +46,19 @@ class RolloutStorage:
         for step in reversed(range(self.num_transitions_per_env)):
             if step == self.num_transitions_per_env - 1:
                 next_values = last_values
-                # next_is_not_terminal = 1.0 - self.dones[step].float()
+                next_return = 0.
             else:
                 next_values = self.values[step + 1]
-                # next_is_not_terminal = 1.0 - self.dones[step+1].float()
+                next_return = self.returns[step + 1]
 
+            self.returns[step] = self.rewards[step] + gamma*next_return
             next_is_not_terminal = 1.0 - self.dones[step].float()
             delta = self.rewards[step] + next_is_not_terminal * gamma * next_values - self.values[step]
             advantage = delta + next_is_not_terminal * gamma * lam * advantage
-            self.returns[step] = advantage + self.values[step]
+            self.action_values[step] = advantage + self.values[step]
 
         # Compute and normalize the advantages
-        self.advantages = self.returns - self.values
+        self.advantages = self.action_values - self.values
         self.advantages = (self.advantages - self.advantages.mean()) / (self.advantages.std() + 1e-8)
 
     def mini_batch_generator_shuffle(self, num_mini_batches):

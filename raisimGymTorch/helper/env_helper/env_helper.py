@@ -73,7 +73,7 @@ class helper:
         self.obs_rms.var = np.loadtxt(var_file_name, dtype=np.float32)
 
 
-    def load_param(self, weight_path, actor, critic, optimizer, data_dir, file_name):
+    def load_param(self, weight_path, actor, critic, learner, data_dir, file_name, save_items=True):
 
         if weight_path == "":
             raise Exception("\nCan't find the pre-trained weight, please provide a pre-trained weight with --weight switch\n")
@@ -88,7 +88,7 @@ class helper:
         items_to_save = [weight_path, mean_csv_path, var_csv_path, weight_dir +file_name + "cfg.yaml", weight_dir +
                              "Environment.hpp"]
 
-        if items_to_save is not None:
+        if items_to_save is not None and save_items:
             pretrained_data_dir = data_dir + '/pretrained_' + weight_path.rsplit('/', 1)[0].rsplit('/', 1)[1]
             os.makedirs(pretrained_data_dir)
             for item_to_save in items_to_save:
@@ -99,5 +99,27 @@ class helper:
         actor.architecture.load_state_dict(checkpoint['actor_architecture_state_dict'])
         actor.distribution.load_state_dict(checkpoint['actor_distribution_state_dict'])
         critic.architecture.load_state_dict(checkpoint['critic_architecture_state_dict'])
-        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-        #scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
+        learner.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        #learner.scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
+
+    def restart_from_last_checkpoint(self, env, saver, actor, critic, learner, update_num):
+        """ ONLY USEFUL FOR DAGGER_RUNNER"""
+        # Reset update number
+        update_modulo = update_num % 10
+
+        # Reset learner params
+        learner.storage.clear()
+        #learner.beta += update_modulo * learner.beta_scheduler
+        #learner.scheduler.step(epoch=(update_num-update_modulo)*learner.num_learning_epochs*learner.num_mini_batches)
+        learner.beta += learner.beta_scheduler
+
+        # Set new environment target
+        for i in range(10 - update_modulo - 1):
+            env.reset()
+
+        # Restore weights from last checkpoint
+        #weight_path = saver.data_dir + "/full_" + str(update_num - update_modulo) + '.pt'
+        #self.load_param(weight_path, actor, critic, learner, saver.data_dir, 'dagger', False)
+
+        #return update_modulo + 1
+        return 1

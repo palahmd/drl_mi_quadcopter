@@ -63,6 +63,7 @@ eval_env = VecEnv(
     eval_cfg['environment'], normalize_ob=False)
 env.turn_off_visualization()
 eval_env.turn_off_visualization()
+last_checkpoint = 0
 
 # observation and action dim
 ob_dim_expert = env.num_obs  # expert has 4 additional values for quaternions
@@ -75,7 +76,7 @@ n_steps = math.floor(cfg['environment']['max_time'] / cfg['environment']['contro
 total_steps = n_steps * env.num_envs
 
 # Expert: PID Controller, target point and initial state to calculate target point
-expert = PID(2.5, 50, 6.5, ob_dim_expert, act_dim, cfg['environment']['control_dt'], 1.727)
+expert = PID(5.5, 50, 6.5, ob_dim_expert, act_dim, cfg['environment']['control_dt'], 1.727)
 expert_actions = np.zeros(shape=(env.num_envs, act_dim), dtype="float32")
 targets = np.zeros(shape=(env.num_envs, ob_dim_expert), dtype="float32")
 vis_target = np.zeros(shape=(1, ob_dim_expert), dtype="float32")
@@ -128,6 +129,7 @@ learner = DAgger(actor=actor, critic=critic, act_dim=act_dim,
                  last_update=last_update,
                  beta_scheduler=cfg['hyperparam']['beta_scheduler'],
                  deterministic_policy=cfg['architecture']['deterministic_policy'],
+                 shuffle_batch=cfg['hyperparam']['shuffle'],
                  device=device)
 
 helper = helper(env=env, num_obs=ob_dim_learner,
@@ -139,9 +141,19 @@ helper = helper(env=env, num_obs=ob_dim_learner,
 learner.beta = cfg['hyperparam']['init_beta']
 
 if mode == 'retrain':
-    helper.load_param(weight_path, actor, critic, learner.optimizer, saver.data_dir, file_name)
+    helper.load_param(weight_path, actor, critic, learner, saver.data_dir, file_name)
     helper.load_scaling(weight_path, last_update)
-    learner.beta = cfg['hyperparam']['init_beta'] - learner.beta_scheduler * last_update
+    last_cfg = YAML().load(open(weight_path.rsplit('/', 1)[0] + '/' + file_name + "cfg.yaml", 'r'))
+
+    # adjust beta probability of learner according to update number
+    delta_beta = cfg['hyperparam']['init_beta'] - cfg['hyperparam']['Beta']
+    last_delta_beta = last_cfg['hyperparam']['init_beta'] - last_cfg['hyperparam']['Beta']
+    last_beta_mod = round(last_cfg['hyperparam']['beta_scheduler'] * last_update,4) % (last_delta_beta)
+    if last_beta_mod < delta_beta: # beta decreasing
+        learner.beta = last_cfg['hyperparam']['init_beta'] - (last_delta_beta - last_beta_mod)
+    else: # beta increasing
+        learner.beta = last_cfg['hyperparam']['init_beta'] - (2*last_delta_beta - last_beta_mod)
+        learner.beta_scheduler = -abs(learner.beta_scheduler)
 
 """ 
 Training Loop
@@ -150,18 +162,11 @@ Training Loop
 for update in range(2000):
     env.reset()
     start = time.time()
-    #env.turn_on_visualization()
 
     # tmeps
     loopCount = 0
     dones_sum = 0
     reward_sum = 0
-
-    # optional: skip first visualization with update = 1
-    if update == 0:
-        update -= 1
-        skip_eval = True
-    update += last_update
 
     """adjust single visualizable env target to all envs. 
     Why this way? -> writing another python wrapper takes too much effort. The visualized env[0] creates a random 
@@ -187,8 +192,14 @@ for update in range(2000):
     if last_targets[0][0] != targets[0][0]:
         print("new target")
 
-    """ Evaluation and saving of the models """
-    if update % cfg['environment']['eval_every_n'] == 0:
+    """ Evaluation and Visualization"""
+    # optional: skip first visualization with update = -1
+    if update == 0:
+        skip_eval = True
+
+    update += last_update - last_checkpoint
+
+    if update % 10 == 0:
         print("Saving the current policy")
         torch.save({
             'actor_architecture_state_dict': actor.architecture.state_dict(),
@@ -199,6 +210,11 @@ for update in range(2000):
         }, saver.data_dir + "/full_" + str(update) + '.pt')
         helper.save_scaling(saver.data_dir, str(update))
 
+    if skip_eval:
+        update = -1
+
+    """ Evaluation and saving of the models """
+    if update % cfg['environment']['vis_every_n'] == 0:
         if cfg['environment']['visualize_eval']:
             print("Visualizing and evaluating the current policy")
 
@@ -213,10 +229,14 @@ for update in range(2000):
 
             # load another graph to evaluate on the evaluation environment, so the loop inside the training environment
             # will not be falsified by the evaluation
-            loaded_graph = module.MLP(cfg['architecture']['policy_net'], eval(cfg['architecture']['activation_fn']),
-                                      ob_dim_learner, act_dim)
-            loaded_graph.load_state_dict(
-                torch.load(saver.data_dir + "/full_" + str(update) + '.pt')['actor_architecture_state_dict'])
+            if cfg['architecture']['shared_nets']:
+                loaded_graph = module.sharedBaseNetMLP(cfg['architecture']['base_net'], cfg['architecture']['policy_net'], cfg['architecture']['value_net'],
+                                                       eval(cfg['architecture']['activation_fn']), ob_dim_learner, [act_dim,1])
+                loaded_graph.load_state_dict(torch.load(saver.data_dir + "/full_" + str(update) + '.pt')['actor_architecture_state_dict'])
+            else:
+                loaded_graph = module.MLP(cfg['architecture']['policy_net'], eval(cfg['architecture']['activation_fn']), ob_dim_learner, act_dim)
+                loaded_graph.load_state_dict(torch.load(saver.data_dir + "/full_" + str(update) + '.pt')['actor_architecture_state_dict'])
+
 
             for step in range(int(n_steps * 1.5)):
                 # separate and expert obs with dim 21 and (normalized) learner obs with dim 18
@@ -225,7 +245,10 @@ for update in range(2000):
                 obs = helper.normalize_observation(obs)
 
                 # limit action either by clipping or scaling
-                action_ll = loaded_graph.architecture(torch.from_numpy(obs).cpu())
+                if cfg['architecture']['shared_nets']:
+                    action_ll = loaded_graph.actor_net(torch.from_numpy(obs))
+                else:
+                    action_ll = loaded_graph.architecture(torch.from_numpy(obs))
                 action_ll = helper.limit_action(action_ll)
 
                 reward, dones = eval_env.step(action_ll)
@@ -247,6 +270,13 @@ for update in range(2000):
             print('{:<40} {:>6}'.format("average reward: ", '{:0.6f}'.format(reward_sum)))
             print('----------------------------------------------------\n')
 
+            dones_sum = 0
+            reward_sum = 0
+
+    if skip_eval:
+        update += last_update - last_checkpoint + 1
+        skip_eval = False
+
     """ Actual training """
     for step in range(n_steps):
 
@@ -267,7 +297,7 @@ for update in range(2000):
         actions = learner.observe(actor_obs=obs, expert_actions=expert_actions, env_helper=helper)
 
         reward, dones = env.step(actions)
-        learner.step(obs=obs, rews=reward, dones=dones)
+        learner.step(rews=reward, dones=dones)
 
         dones_sum += sum(dones)
         reward_sum += sum(reward)
@@ -281,20 +311,25 @@ for update in range(2000):
 
         expert_obs = env.observe()
 
+    """"
+    if dones_sum != 0:
+        learner.storage.purge_failed_episodes()
+        print('----------------------------------------------------')
+        print("controller failed")
+        print('----------------------------------------------------\n')
+    """"
     learner_obs = expert_obs.copy()
     for i in range(0, env.num_envs):
         obs[i] = learner_obs[i][0:18]
     obs = helper.normalize_observation(obs)
-
-    if skip_eval:
-        update += 1
-        skip_eval = False
     mean_loss, mean_action_loss, mean_action_log_prob_loss, mean_value_loss = learner.update(obs=obs,
                                                                                              log_this_iteration=update % 10 == 0,
                                                                                              update=update)
     actor.distribution.enforce_minimum_std((torch.ones(4)).to(device))
 
     end = time.time()
+
+    # save the current policy after every 10 update steps
 
     print('----------------------------------------------------')
     print('{:>6}th iteration'.format(update))
@@ -312,3 +347,10 @@ for update in range(2000):
     print('action std: ')
     print(actor.distribution.std.cpu().detach().numpy())
     print('----------------------------------------------------\n')
+
+   # else:
+        #last_checkpoint += helper.restart_from_last_checkpoint(env=env, saver=saver, actor=actor, critic=critic,
+                                                              #learner=learner, update_num=update)
+        #print('----------------------------------------------------')
+        #print('{:<40} {:>6}'.format("Controller failed, last checkpoint restored to: ", '{:0.6f}'.format(update - last_checkpoint)))
+        #print('----------------------------------------------------\n')
