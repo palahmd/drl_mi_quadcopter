@@ -45,12 +45,13 @@ hyperparam:
   num_mini_batches: 4
   num_learning_epochs: 50
   shuffle: True # True should give better sample efficiency
-  Gamma: 0.995
+  gamma: 0.998
+  lam: 0.95
   init_beta: 1.0
-  Beta: 0.
+  beta_min: 0.
   beta_scheduler: 0.002
   use_lr_scheduler: True
-  max_lr: 0.0025
+  max_lr: 0.0035
   min_lr: 0.001 # is the actual learning rate if use_lr_scheduler = False
   l2_reg_weight: 0.005
   entropy_weight: 0.0

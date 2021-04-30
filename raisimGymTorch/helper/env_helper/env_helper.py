@@ -109,8 +109,8 @@ class helper:
 
         # Reset learner params
         learner.storage.clear()
-        #learner.beta += update_modulo * learner.beta_scheduler
-        #learner.scheduler.step(epoch=(update_num-update_modulo)*learner.num_learning_epochs*learner.num_mini_batches)
+        learner.beta += update_modulo * learner.beta_scheduler
+        learner.scheduler.step(epoch=(update_num-update_modulo)*learner.num_learning_epochs*learner.num_mini_batches)
         learner.beta += learner.beta_scheduler
 
         # Set new environment target
@@ -118,8 +118,7 @@ class helper:
             env.reset()
 
         # Restore weights from last checkpoint
-        #weight_path = saver.data_dir + "/full_" + str(update_num - update_modulo) + '.pt'
-        #self.load_param(weight_path, actor, critic, learner, saver.data_dir, 'dagger', False)
+        weight_path = saver.data_dir + "/full_" + str(update_num - update_modulo) + '.pt'
+        self.load_param(weight_path, actor, critic, learner, saver.data_dir, 'dagger', False)
 
-        #return update_modulo + 1
-        return 1
+        return update_modulo + 1

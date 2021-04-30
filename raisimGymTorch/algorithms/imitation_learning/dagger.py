@@ -5,6 +5,7 @@ import torch
 import torch.optim as optim
 import numpy as np
 import os
+import random
 
 
 class DAgger:
@@ -18,6 +19,8 @@ class DAgger:
                  num_learning_epochs,
                  beta,
                  log_dir,
+                 gamma = 0.99,
+                 lam = 0.95,
                  use_lr_scheduler=True,
                  min_lr=0.001,
                  max_lr=0.01,
@@ -76,6 +79,8 @@ class DAgger:
         self.beta_scheduler = beta_scheduler
         self.l2_reg_weight = l2_reg_weight
         self.entropy_weight = entropy_weight
+        self.gamma = gamma
+        self.lam = lam
 
         # Log
         self.log_dir = os.path.join(log_dir, datetime.now().strftime('%b%d_%H-%M-%S'))
@@ -90,6 +95,8 @@ class DAgger:
         self.actions = np.zeros((self.num_envs, self.act_dim), dtype="float32")
         self.expert_chosen = torch.zeros((self.num_envs, 1), dtype=bool).to(self.device)
         self.learner_actions_log_prob = torch.zeros((self.num_envs, 1)).to(self.device)
+        self.tot_dones = 0
+        self.failed_envs = 0
 
     def observe(self, actor_obs, expert_actions, env_helper):
         self.actor_obs = actor_obs
@@ -117,11 +124,14 @@ class DAgger:
         last_values = self.critic.predict(torch.from_numpy(obs).to(self.device))
 
         # calculate logging variables
-        self.storage.compute_returns(last_values.to(self.device), 0.996, 0.95)
-        
+        self.storage.compute_returns(last_values.to(self.device), self.gamma, self.lam)
+
         mean_loss, mean_action_loss, mean_action_log_prob_loss, mean_l2_reg_loss, mean_entropy_loss, \
-        mean_returns, mean_advantages, mean_value_loss, mean_values, tot_dones, infos \
+        mean_returns, mean_advantages, mean_value_loss, mean_values, self.tot_dones, self.failed_envs, \
+        prevented_dones, infos \
             = self._train_step_with_behavioral_cloning()
+        tot_dones = self.tot_dones
+        failed_envs = self.failed_envs
 
         # calculate beta for the next iteration
         self.adjust_beta()
@@ -141,7 +151,9 @@ class DAgger:
         self.writer.add_scalar('Actor/mean_loss', variables['mean_loss'], variables['it'])
         self.writer.add_scalar('Actor/action_loss', variables['mean_action_loss'], variables['it'])
         self.writer.add_scalar('Actor/action_log_prob_loss', variables['mean_action_log_prob_loss'], variables['it'])
-        self.writer.add_scalar('Actor/tot_dones', variables['tot_dones'], variables['it'])
+        self.writer.add_scalar('Environment/tot_dones', variables['tot_dones'], variables['it'])
+        self.writer.add_scalar('Environment/prevented_dones', variables['prevented_dones'], variables['it'])
+        self.writer.add_scalar('Environment/failed_envs', variables['failed_envs'], variables['it'])
         self.writer.add_scalar('Actor/mean_entropy_loss', variables['mean_entropy_loss'], variables['it'])
         self.writer.add_scalar('Actor/mean_l2_reg_loss', variables['mean_l2_reg_loss'], variables['it'])
         self.writer.add_scalar('Actor/mean_noise_std', mean_std.item(), variables['it'])
@@ -184,6 +196,36 @@ class DAgger:
     """ Main training: rolling out storage and training the learner with one-step behavioral cloning """
 
     def _train_step_with_behavioral_cloning(self):
+        compl_envs = torch.where(self.storage.dones == 0)
+        compl_envs_index = list(dict.fromkeys(compl_envs[1].tolist()))
+        self.failed_envs = self.num_envs-len(compl_envs_index)
+
+        if len(compl_envs_index) < self.num_envs:
+            compl_obs = torch.zeros_like(self.storage.actor_obs).to(self.device)
+            compl_expert_actions = torch.zeros_like(self.storage.expert_actions).to(self.device)
+            compl_values = torch.zeros_like(self.storage.values).to(self.device)
+            compl_returns = torch.zeros_like(self.storage.returns).to(self.device)
+            compl_advantages = torch.zeros_like(self.storage.advantages).to(self.device)
+            compl_dones = torch.zeros_like(self.storage.dones).to(self.device)
+
+            for i in range(len(compl_envs_index)):
+                for j in range(self.num_transitions_per_env):
+                    compl_obs[j][i] = self.storage.actor_obs[j][compl_envs_index[i]].to(self.device)
+                    compl_expert_actions[j][i] = self.storage.expert_actions[j][i].to(self.device)
+                    compl_values[j][i] = self.storage.values[j][compl_envs_index[i]].to(self.device)
+                    compl_returns[j][i] = self.storage.returns[j][compl_envs_index[i]].to(self.device)
+                    compl_advantages[j][i] = self.storage.advantages[j][compl_envs_index[i]].to(self.device)
+                    compl_dones[j][i] = self.storage.dones[j][compl_envs_index[i]].to(self.device)
+
+        else:
+            compl_obs = self.storage.actor_obs.to(self.device)
+            compl_expert_actions = self.storage.expert_actions.to(self.device)
+            compl_values = self.storage.values.to(self.device)
+            compl_returns = self.storage.returns.to(self.device)
+            compl_advantages = self.storage.advantages.to(self.device)
+            compl_dones = self.storage.dones.to(self.device)
+
+        # for logging
         mean_loss = 0
         mean_action_loss = 0
         mean_action_log_prob_loss = 0
@@ -193,11 +235,22 @@ class DAgger:
         mean_advantages = 0
         mean_value_loss = 0
         mean_values = 0
-        tot_dones = 0
+        self.tot_dones = 0
         for epoch in range(self.num_learning_epochs):
+            for i in range(self.failed_envs):
+                rand_num = random.randint(0, len(compl_envs_index)-1)
+                for j in range(self.num_transitions_per_env):
+                    compl_obs[j][-1-i] = self.compl_obs[j][rand_num]
+                    compl_expert_actions[j][-1-i] = compl_expert_actions[j][rand_num]
+                    compl_values[j][-1-i] = compl_values[j][rand_num]
+                    compl_returns[j][-1-i] = compl_returns[j][rand_num]
+                    compl_advantages[j][-1-i] = compl_advantages[j][rand_num]
+                    compl_dones[j][-1-i] = compl_dones[j][rand_num]
+
             for actor_obs_batch, expert_actions_batch, target_values_batch, \
                 advantages_batch, returns_batch, dones_batch \
-                    in self.batch_sampler(self.num_mini_batches):
+                    in self.batch_sampler(self.num_mini_batches, compl_obs, compl_expert_actions, compl_values, compl_returns,
+                                          compl_advantages, compl_dones):
 
                 act_log_prob_batch, entropy_batch = self.actor.evaluate(actor_obs_batch, expert_actions_batch)
                 new_actions_batch = self.actor.noiseless_action(actor_obs_batch).to(self.device)
@@ -234,7 +287,7 @@ class DAgger:
                 mean_advantages += advantages_batch.mean().item()
                 mean_value_loss += value_loss.item()
                 mean_values += target_values_batch.mean().item()
-                tot_dones += dones_batch.sum().item()
+                self.tot_dones += dones_batch.sum().item()
 
 
         num_updates = self.num_learning_epochs * self.num_mini_batches
@@ -247,7 +300,9 @@ class DAgger:
         mean_advantages /= num_updates
         mean_value_loss /= num_updates
         mean_values /= num_updates
-        tot_dones /= num_updates
+        self.tot_dones /= num_updates
+        prevented_dones = self.storage.dones.sum()
 
         return mean_loss, mean_action_loss, mean_action_log_prob_loss, mean_l2_reg_loss, mean_entropy_loss, \
-               mean_returns, mean_advantages, mean_value_loss, mean_values, tot_dones, locals()
+               mean_returns, mean_advantages, mean_value_loss, mean_values, self.tot_dones, self.failed_envs, \
+               prevented_dones, locals()

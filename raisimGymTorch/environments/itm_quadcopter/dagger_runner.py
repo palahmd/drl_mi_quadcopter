@@ -76,7 +76,7 @@ n_steps = math.floor(cfg['environment']['max_time'] / cfg['environment']['contro
 total_steps = n_steps * env.num_envs
 
 # Expert: PID Controller, target point and initial state to calculate target point
-expert = PID(5.5, 50, 6.5, ob_dim_expert, act_dim, cfg['environment']['control_dt'], 1.727)
+expert = PID(2.5, 50, 6.5, ob_dim_expert, act_dim, cfg['environment']['control_dt'], 1.727)
 expert_actions = np.zeros(shape=(env.num_envs, act_dim), dtype="float32")
 targets = np.zeros(shape=(env.num_envs, ob_dim_expert), dtype="float32")
 vis_target = np.zeros(shape=(1, ob_dim_expert), dtype="float32")
@@ -120,7 +120,9 @@ learner = DAgger(actor=actor, critic=critic, act_dim=act_dim,
                  num_mini_batches=cfg['hyperparam']['num_mini_batches'],
                  num_learning_epochs=cfg['hyperparam']['num_learning_epochs'],
                  log_dir=saver.data_dir,
-                 beta=cfg['hyperparam']['Beta'],
+                 beta=cfg['hyperparam']['beta_min'],
+                 gamma=cfg['hyperparam']['gamma'],
+                 lam=cfg['hyperparam']['lam'],
                  l2_reg_weight=cfg['hyperparam']['l2_reg_weight'],
                  entropy_weight=cfg['hyperparam']['entropy_weight'],
                  use_lr_scheduler=cfg['hyperparam']['use_lr_scheduler'],
@@ -146,8 +148,8 @@ if mode == 'retrain':
     last_cfg = YAML().load(open(weight_path.rsplit('/', 1)[0] + '/' + file_name + "cfg.yaml", 'r'))
 
     # adjust beta probability of learner according to update number
-    delta_beta = cfg['hyperparam']['init_beta'] - cfg['hyperparam']['Beta']
-    last_delta_beta = last_cfg['hyperparam']['init_beta'] - last_cfg['hyperparam']['Beta']
+    delta_beta = cfg['hyperparam']['init_beta'] - cfg['hyperparam']['beta_min']
+    last_delta_beta = last_cfg['hyperparam']['init_beta'] - last_cfg['hyperparam']['beta_min']
     last_beta_mod = round(last_cfg['hyperparam']['beta_scheduler'] * last_update,4) % (last_delta_beta)
     if last_beta_mod < delta_beta: # beta decreasing
         learner.beta = last_cfg['hyperparam']['init_beta'] - (last_delta_beta - last_beta_mod)
@@ -311,13 +313,16 @@ for update in range(2000):
 
         expert_obs = env.observe()
 
-    """"
+    """""
     if dones_sum != 0:
         learner.storage.purge_failed_episodes()
         print('----------------------------------------------------')
         print("controller failed")
         print('----------------------------------------------------\n')
-    """"
+    """""
+
+    tot_dones = learner.tot_dones
+    failed_envs = learner.failed_envs
     learner_obs = expert_obs.copy()
     for i in range(0, env.num_envs):
         obs[i] = learner_obs[i][0:18]
@@ -333,8 +338,10 @@ for update in range(2000):
 
     print('----------------------------------------------------')
     print('{:>6}th iteration'.format(update))
-    print('{:<40} {:>6}'.format("average dones: ", '{:0.6f}'.format(dones_sum)))
-    print('{:<40} {:>6}'.format("average reward: ", '{:0.6f}'.format(reward_sum)))
+    print('{:<40} {:>6}'.format("tot dones in simulation: ", '{:0.6f}'.format(dones_sum)))
+    print('{:<40} {:>6}'.format("tot dones in train step: ", '{:0.6f}'.format(tot_dones)))
+    print('{:<40} {:>6}'.format("failed_envs: ", '{:0.6f}'.format(failed_envs)))
+    print('{:<40} {:>6}'.format("total reward: ", '{:0.6f}'.format(reward_sum)))
     print('{:<40} {:>6}'.format("beta: ", '{:0.6f}'.format(learner.beta + learner.beta_scheduler)))
     print('{:<40} {:>6}'.format("mean loss: ", '{:0.6f}'.format(mean_loss)))
     print('{:<40} {:>6}'.format("mean action log prob loss: ", '{:0.6f}'.format(mean_action_log_prob_loss)))

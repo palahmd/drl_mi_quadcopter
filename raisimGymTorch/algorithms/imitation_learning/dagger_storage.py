@@ -65,52 +65,37 @@ class RolloutStorage:
         self.advantages = self.action_values - self.values
         self.advantages = (self.advantages - self.advantages.mean()) / (self.advantages.std() + 1e-8)
 
-    def mini_batch_generator_shuffle(self, num_mini_batches):
-        fin_envs = torch.where(self.dones==0)
-        fin_index = list(dict.fromkeys(fin_envs[1].tolist()))
-        batch_size = len(fin_index) * self.num_transitions_per_env
+    def mini_batch_generator_shuffle(self, num_mini_batches, actor_obs, expert_actions, values, returns,
+                                     advantages, dones):
+        batch_size = self.num_envs * self.num_transitions_per_env
         mini_batch_size = batch_size // num_mini_batches
 
-        obs_batch = torch.zeros(self.num_transitions_per_env, len(fin_index), self.num_obs).to(self.device)
-        expert_batch = torch.zeros(self.num_transitions_per_env, len(fin_index), self.num_acts).to(self.device)
-        val_batch = torch.zeros(self.num_transitions_per_env, len(fin_index), 1).to(self.device)
-        ret_batch = torch.zeros(self.num_transitions_per_env, len(fin_index), 1).to(self.device)
-        adv_batch = torch.zeros(self.num_transitions_per_env, len(fin_index), 1).to(self.device)
-        d_batch = torch.zeros(self.num_transitions_per_env, len(fin_index), 1).to(self.device)
-
-        for j in range(self.num_transitions_per_env):
-            for i in range(len(fin_index)):
-                obs_batch[j][i] = self.actor_obs[j][i]
-                expert_batch[j][i] = self.expert_actions[j][i]
-                val_batch[j][i] = self.values[j][i]
-                ret_batch[j][i] = self.returns[j][i]
-                adv_batch[j][i] = self.advantages[j][i]
-                d_batch[j][i] = self.dones[j][i]
-
         for indices in BatchSampler(SubsetRandomSampler(range(batch_size)), mini_batch_size, drop_last=True):
-            actor_obs_batch = obs_batch.view(-1, *self.actor_obs.size()[2:])[indices]
-            expert_actions_batch = expert_batch.view(-1, self.expert_actions.size(-1))[indices]
-            values_batch = val_batch.view(-1, 1)[indices]
-            returns_batch = ret_batch.view(-1, 1)[indices]
-            advantages_batch = adv_batch.view(-1, 1)[indices]
-            dones_batch = d_batch.view(-1, 1)[indices]
+            actor_obs_batch = actor_obs.view(-1, *self.actor_obs.size()[2:])[indices]
+            expert_actions_batch = expert_actions.view(-1, self.expert_actions.size(-1))[indices]
+            values_batch = values.view(-1, 1)[indices]
+            returns_batch = returns.view(-1, 1)[indices]
+            advantages_batch = advantages.view(-1, 1)[indices]
+            dones_batch = dones.view(-1, 1)[indices]
             yield actor_obs_batch, expert_actions_batch, \
                   values_batch, advantages_batch, returns_batch, dones_batch
 
-    def mini_batch_generator_inorder(self, num_mini_batches):
+    def mini_batch_generator_inorder(self, num_mini_batches, actor_obs, expert_actions, values, returns,
+                                     advantages, dones):
         batch_size = self.num_envs * self.num_transitions_per_env
         mini_batch_size = batch_size // num_mini_batches
 
         for batch_id in range(num_mini_batches):
-            yield self.actor_obs.view(-1, *self.actor_obs.size()[2:])[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size], \
-                self.expert_actions.view(-1, self.expert_actions.size(-1))[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size],\
-                self.values.view(-1, 1)[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size], \
-                self.advantages.view(-1, 1)[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size], \
-                self.returns.view(-1, 1)[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size], \
-                self.dones.view(-1, 1)[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size]
+            yield actor_obs.view(-1, *self.actor_obs.size()[2:])[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size], \
+                expert_actions.view(-1, self.expert_actions.size(-1))[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size],\
+                values.view(-1, 1)[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size], \
+                advantages.view(-1, 1)[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size], \
+                returns.view(-1, 1)[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size], \
+                dones.view(-1, 1)[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size]
 
-    def purge_failed_episodes(self):
-        failed_envs = torch.where(self.dones==1)
+
+    def reset_failed_episodes(self):
+        failed_envs = torch.where(self.dones == 1)
         index = failed_envs[1].tolist()
 
         for i in range(len(index)):
