@@ -4,17 +4,17 @@ record_video: yes
 environment:
   simulation_dt: 0.002
   control_dt: 0.01
-  max_time: 15.0
+  max_time: 10.0
   render: True
 
   num_envs: 96
   vis_every_n: 20
   visualize_eval: True
-  num_threads: 40
+  num_threads: 30
 
   reward:
     position:
-      coeff: -0.002
+      coeff: -0.004
     relPosition:
       coeff: 0.0
     thrust:
@@ -28,8 +28,8 @@ environment:
 architecture:
   shared_nets: False
   base_net: [64]
-  policy_net: [64, 64]
-  value_net: [64, 64]
+  policy_net: [64, 64] # if shared_nets: True: first element in list will be skipped. i.e. actor_net will
+  value_net: [64, 64]  # be set with [base_net, policy_net[1]]. For more layers, modify actor_critic.py.
   activation_fn: nn.LeakyReLU
   deterministic_policy: False # if True: does not converge, because action loss will be used instead of log prob action loss
                               # False: loss = -logProb
@@ -49,10 +49,10 @@ hyperparam:
   lam: 0.95
   init_beta: 1.0
   beta_min: 0.
-  beta_scheduler: 0.002
+  beta_scheduler: 0.001
   use_lr_scheduler: True
-  max_lr: 0.0035
-  min_lr: 0.001 # is the actual learning rate if use_lr_scheduler = False
+  max_lr: 0.0015
+  min_lr: 0.0005 # is the actual learning rate if use_lr_scheduler = False
   l2_reg_weight: 0.005
   entropy_weight: 0.0
 

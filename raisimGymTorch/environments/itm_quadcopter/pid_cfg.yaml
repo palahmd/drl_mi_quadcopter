@@ -4,7 +4,7 @@ record_video: yes
 environment:
   simulation_dt: 0.002
   control_dt: 0.01
-  max_time: 16.0
+  max_time: 10.0
   render: True
 
   num_envs: 96
@@ -14,9 +14,9 @@ environment:
 
   reward:
     position:
-      coeff: -0.002
+      coeff: -0.004
     relPosition:
-      coeff: 0.002
+      coeff:
     thrust:
       coeff: 0.0
     orientation:

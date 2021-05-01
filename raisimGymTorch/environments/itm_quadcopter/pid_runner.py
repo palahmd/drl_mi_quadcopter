@@ -43,7 +43,7 @@ for i in range(len(init_state)):
 n_steps = math.floor(cfg['environment']['max_time'] / cfg['environment']['control_dt'])
 total_steps = n_steps * env.num_envs
 
-pid = PID(2.5, 50, 6.5, ob_dim, act_dim, cfg['environment']['control_dt'], 1.727)
+pid = PID(3, 200,5.5, ob_dim, act_dim, cfg['environment']['control_dt'], 1.727)
 
 for update in range(1000000):
     for i in range(10):
@@ -74,9 +74,9 @@ for update in range(1000000):
         
         # frequency of outter PID acceleration controller
         if loopCount == 8:
-            loopCount = 0
-            if step >= n_steps/4:
-                loopCount = 3
+            loopCount = 7
+            #if step >= n_steps/4:
+             #   loopCount = 3
         loopCount += 1
 
         frame_end = time.time()

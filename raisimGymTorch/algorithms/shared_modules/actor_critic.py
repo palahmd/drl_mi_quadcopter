@@ -102,11 +102,10 @@ class sharedBaseNetMLP(nn.Module):
         self.activation_fn = activation_fn
 
         base_module = [nn.Linear(input_size, base_shape[0]), self.activation_fn()]
-        actor_modules = [nn.Linear(base_shape[0], actor_shape[0]), self.activation_fn()]
-        critic_modules = [nn.Linear(base_shape[0], critic_shape[0]), self.activation_fn()]
+        actor_modules = [nn.Linear(base_shape[0], actor_shape[1]), self.activation_fn()]
+        critic_modules = [nn.Linear(base_shape[0], critic_shape[1]), self.activation_fn()]
         actor_modules.append(nn.Linear(actor_shape[-1], output_size[0]))
         critic_modules.append(nn.Linear(critic_shape[-1], output_size[1]))
-        base_scale = [np.sqrt(2)]
         actor_scale = [np.sqrt(2), np.sqrt(2)]
         critic_scale = [np.sqrt(2), np.sqrt(2)]
 

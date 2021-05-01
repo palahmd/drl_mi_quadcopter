@@ -3,6 +3,7 @@ from raisimGymTorch.env.bin import itm_quadcopter
 from raisimGymTorch.env.RaisimGymVecEnv import RaisimGymVecEnv as VecEnv
 from raisimGymTorch.algo.pid_controller.pid_controller import PID
 from raisimGymTorch.algo.imitation_learning.dagger import DAgger
+from raisimGymTorch.algo.imitation_learning.dagger_critic import DAgger_Critic
 from raisimGymTorch.helper.raisim_gym_helper import ConfigurationSaver, tensorboard_launcher
 from raisimGymTorch.helper.env_helper.env_helper import helper
 import raisimGymTorch.algo.shared_modules.actor_critic as module
@@ -76,7 +77,7 @@ n_steps = math.floor(cfg['environment']['max_time'] / cfg['environment']['contro
 total_steps = n_steps * env.num_envs
 
 # Expert: PID Controller, target point and initial state to calculate target point
-expert = PID(2.5, 50, 6.5, ob_dim_expert, act_dim, cfg['environment']['control_dt'], 1.727)
+expert = PID(3, 200, 5.5, ob_dim_expert, act_dim, cfg['environment']['control_dt'], 1.727)
 expert_actions = np.zeros(shape=(env.num_envs, act_dim), dtype="float32")
 targets = np.zeros(shape=(env.num_envs, ob_dim_expert), dtype="float32")
 vis_target = np.zeros(shape=(1, ob_dim_expert), dtype="float32")
@@ -134,6 +135,8 @@ learner = DAgger(actor=actor, critic=critic, act_dim=act_dim,
                  shuffle_batch=cfg['hyperparam']['shuffle'],
                  device=device)
 
+#critic_learner = DAgger_Critic(critic, learner)
+
 helper = helper(env=env, num_obs=ob_dim_learner,
                 normalize_ob=cfg['helper']['normalize_ob'],
                 update_mean=cfg['helper']['update_mean'],
@@ -166,7 +169,7 @@ for update in range(2000):
     start = time.time()
 
     # tmeps
-    loopCount = 0
+    loopCount = 8
     dones_sum = 0
     reward_sum = 0
 
@@ -305,11 +308,11 @@ for update in range(2000):
         reward_sum += sum(reward)
 
         # for outter pid-control loop running five times slower
-        if loopCount == 8:
-            loopCount = 0
-            if step >= n_steps/4:
-                loopCount = 3
-        loopCount += 1
+        #if loopCount == 8:
+        #    loopCount = 0
+        #    if step >= n_steps/4:
+        #        loopCount = 3
+        #loopCount += 1
 
         expert_obs = env.observe()
 
@@ -321,16 +324,18 @@ for update in range(2000):
         print('----------------------------------------------------\n')
     """""
 
-    tot_dones = learner.tot_dones
-    failed_envs = learner.failed_envs
     learner_obs = expert_obs.copy()
     for i in range(0, env.num_envs):
         obs[i] = learner_obs[i][0:18]
     obs = helper.normalize_observation(obs)
+    #critic_learner.train()
     mean_loss, mean_action_loss, mean_action_log_prob_loss, mean_value_loss = learner.update(obs=obs,
                                                                                              log_this_iteration=update % 10 == 0,
                                                                                              update=update)
     actor.distribution.enforce_minimum_std((torch.ones(4)).to(device))
+    tot_dones = learner.tot_dones
+    failed_envs = learner.failed_envs
+
 
     end = time.time()
 

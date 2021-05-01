@@ -14,9 +14,9 @@ environment:
 
   reward:
     position:
-      coeff: -0.002
+      coeff: -0.004
     relPosition:
-      coeff: 0.002
+      coeff: 0.0
     thrust:
       coeff: 0.0 # maybe not a good choice
     orientation:
