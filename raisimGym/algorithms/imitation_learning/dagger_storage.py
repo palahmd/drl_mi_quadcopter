@@ -13,7 +13,6 @@ class RolloutStorage:
 
         # For DAgger and BC
         self.values = torch.zeros(num_transitions_per_env, num_envs, 1).to(self.device)
-        self.action_values = torch.zeros(num_transitions_per_env, num_envs, 1).to(self.device)
         self.returns = torch.zeros(num_transitions_per_env, num_envs, 1).to(self.device)
         self.advantages = torch.zeros(num_transitions_per_env, num_envs, 1).to(self.device)
         self.expert_actions = torch.zeros(num_transitions_per_env, num_envs, *actions_shape).to(self.device)
@@ -50,19 +49,16 @@ class RolloutStorage:
         for step in reversed(range(self.num_transitions_per_env)):
             if step == self.num_transitions_per_env - 1:
                 next_values = last_values
-                next_return = 0.
             else:
                 next_values = self.values[step + 1]
-                next_return = self.returns[step + 1]
 
-            self.returns[step] = self.rewards[step] + gamma*next_return
             next_is_not_terminal = 1.0 - self.dones[step].float()
             delta = self.rewards[step] + next_is_not_terminal * gamma * next_values - self.values[step]
             advantage = delta + next_is_not_terminal * gamma * lam * advantage
-            self.action_values[step] = advantage + self.values[step]
+            self.returns[step] = advantage + self.values[step]
 
         # Compute and normalize the advantages
-        self.advantages = self.action_values - self.values
+        self.advantages = self.returns - self.values
         self.advantages = (self.advantages - self.advantages.mean()) / (self.advantages.std() + 1e-8)
 
     def mini_batch_generator_shuffle(self, num_mini_batches):
@@ -96,30 +92,29 @@ class RolloutStorage:
         failed_envs = torch.where(self.dones == 1)
         index = failed_envs[1].tolist()
 
-        for i in range(len(index)):
-            for j in range(len(self.dones)):
-                self.actor_obs[j][index[i]] = self.init_state
-                self.expert_actions[j][index[i]] = self.init_action
-                self.rewards[j][index[i]] = 0
+        for env in range(len(index)-1):
+            for transition in range(len(self.dones)):
+                self.actor_obs[transition][index[env]] = self.init_state
+                self.expert_actions[transition][index[env]] = self.init_action
+                self.rewards[transition][index[env]] = 0
 
-     
+
     def remove_failed_envs(self):
         failed_envs = torch.where(self.dones == 1)
         failed_envs_index = list(dict.fromkeys(failed_envs[1].tolist()))
-        compl_envs = torch.where(self.dones == 0)
-        compl_envs_index = [env for env in list(dict.fromkeys(compl_envs[1].tolist())) if env not in failed_envs_index]
-
         num_failed_envs = len(failed_envs_index)
 
         if num_failed_envs > 0:
-            for i in range(len(failed_envs_index)):
+            compl_envs = torch.where(self.dones == 0)
+            compl_envs_index = [env for env in list(dict.fromkeys(compl_envs[1].tolist())) if env not in failed_envs_index]
+            for env in range(num_failed_envs-1):
                 rand_num = random.randint(0, len(compl_envs_index)-1)
-                for j in range(self.num_transitions_per_env):
-                    self.actor_obs[j][failed_envs_index[i]] = self.actor_obs[j][compl_envs_index[rand_num]]
-                    self.expert_actions[j][failed_envs_index[i]] = self.expert_actions[j][compl_envs_index[rand_num]]
-                    self.values[j][failed_envs_index[i]] = self.values[j][compl_envs_index[rand_num]]
-                    self.advantages[j][failed_envs_index[i]] = self.advantages[j][compl_envs_index[rand_num]]
-                    self.returns[j][failed_envs_index[i]] =self.returns[j][compl_envs_index[rand_num]]
-                    self.dones[j][failed_envs_index[i]] = self.dones[j][compl_envs_index[rand_num]]
+                for transition in range(self.num_transitions_per_env):
+                    self.actor_obs[transition][failed_envs_index[env]] = self.actor_obs[transition][compl_envs_index[rand_num]]
+                    self.expert_actions[transition][failed_envs_index[env]] = self.expert_actions[transition][compl_envs_index[rand_num]]
+                    self.values[transition][failed_envs_index[env]] = self.values[transition][compl_envs_index[rand_num]]
+                    self.advantages[transition][failed_envs_index[env]] = self.advantages[transition][compl_envs_index[rand_num]]
+                    self.returns[transition][failed_envs_index[env]] =self.returns[transition][compl_envs_index[rand_num]]
+                    self.dones[transition][failed_envs_index[env]] = self.dones[transition][compl_envs_index[rand_num]]
 
         return num_failed_envs

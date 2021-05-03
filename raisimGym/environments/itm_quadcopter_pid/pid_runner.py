@@ -61,12 +61,10 @@ for update in range(1000000):
     for step in range(n_steps):
         frame_start = time.time()
         obs += targets
-        #for i in range(0, env.num_envs):
-        #    expert_obs_env_i = obs[i, :]
-        #    actions[i, :] = pid.control(obs=expert_obs_env_i.reshape((ob_dim, 1)),
-        #                                          target=targets[i][0:12].reshape((12, 1)), loopCount=loopCount)
         for i in range(0, env.num_envs):
-            actions[i] = obs[i][18:22]
+            expert_obs_env_i = obs[i, :]
+            actions[i, :] = pid.control(obs=expert_obs_env_i.reshape((ob_dim, 1)),
+                                                  target=targets[i][0:12].reshape((12, 1)), loopCount=loopCount)
 
         reward_ll, dones = env.step(actions)
         reward_ll_sum += sum(reward_ll)

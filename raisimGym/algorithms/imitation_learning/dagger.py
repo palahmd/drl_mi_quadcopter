@@ -105,16 +105,17 @@ class DAgger:
 
         # set expert action and calculate leraner action
         self.expert_actions = torch.from_numpy(expert_actions).to(self.device)
-        self.learner_actions = self.actor.noiseless_action(torch.from_numpy(actor_obs).to(self.device))
-        #self.learner_actions, self.learner_actions_log_prob = self.actor.sample(torch.from_numpy(actor_obs).to(self.device))
+        # self.learner_actions = self.actor.noiseless_action(torch.from_numpy(actor_obs).to(self.device))
+        self.learner_actions, _ = self.actor.sample(torch.from_numpy(actor_obs).to(self.device))
 
         # take expert action with beta prob. and policy action with (1-beta) prob.
-        self.choose_action_per_env()
-        for i in range(0, len(self.expert_chosen)):
-            if self.expert_chosen[i][0]:
-                self.actions[i][:] = expert_actions[i][:]
-            else:
-                self.actions[i][:] = env_helper.limit_action(self.learner_actions[i][:])
+        self.actions = expert_actions
+        self.choose_action_per_env(env_helper)
+        #for i in range(0, len(self.expert_chosen)):
+        #    if self.expert_chosen[i][0]:
+        #        self.actions[i][:] = expert_actions[i][:]
+        #    else:
+        #        self.actions[i][:] = env_helper.limit_action(self.learner_actions[i][:])
 
         return self.actions
 
@@ -163,42 +164,34 @@ class DAgger:
         self.writer.add_scalar('Critic/mean_returns', variables['mean_returns'], variables['it'])
         
 
-    def choose_action_per_env(self):
+    def choose_action_per_env(self, env_helper):
         # choose expert action with beta probability
-        for i in range(0, len(self.expert_actions)):
-            if np.random.uniform(0, 1) > self.beta:
-                self.expert_chosen[i][0] = False
-            else:
-                self.expert_chosen[i][0] = True
+        learners_chance = np.random.rand(self.num_envs, 1)
+        learner_chosen = np.greater_equal(learners_chance, self.beta)
+        chosen_envs = np.where(learner_chosen == True)
+        chosen_envs = list(dict.fromkeys(chosen_envs[0].tolist()))
+
+        if len(chosen_envs) > 0:
+            for env in range(len(chosen_envs)-1):
+                # env_helper.limit_actions if action should be clipped
+                self.actions[chosen_envs[env]] = env_helper.limit_action(self.learner_actions[chosen_envs[env]])
+
 
     def adjust_beta(self):
         if self.beta <= self.beta_goal:
-            self.beta = self.beta_goal
-            self.beta_scheduler = -abs(self.beta_scheduler)
-            #if self.use_lr_scheduler:
-            #    self.scheduler = optim.lr_scheduler.CyclicLR(self.optimizer, base_lr=self.min_lr/2, cycle_momentum=False
-            #                                             , max_lr=self.max_lr/2, step_size_up=2*self.num_mini_batches,
-            #                                             last_epoch=-1, verbose=False)
+            #self.beta_scheduler = -abs(self.beta_scheduler)
+            self.beta_scheduler = 0
 
-        if self.beta >= (1):
-            self.beta = 1
+        if self.beta >= 1:
             self.beta_scheduler = abs(self.beta_scheduler)
-            #if self.use_lr_scheduler:
-            #    self.scheduler = optim.lr_scheduler.CyclicLR(self.optimizer, base_lr=self.min_lr/4, cycle_momentum=False
-            #                                             , max_lr=self.max_lr/4,
-            #                                                step_size_up=self.num_mini_batches*4,
-            #                                             last_epoch=-1, verbose=False)
 
         self.beta -= self.beta_scheduler
-
-        #if self.beta > self.beta_goal:
-        #    self.beta -= self.beta_scheduler
 
     """ Main training: rolling out storage and training the learner with one-step behavioral cloning """
 
     def _train_step_with_behavioral_cloning(self):
         prevented_dones = self.storage.dones.sum()
-        self.failed_envs = self.storage.remove_failed_envs()
+        #self.failed_envs = self.storage.remove_failed_envs()
 
         # for logging
         mean_loss = 0
@@ -220,7 +213,6 @@ class DAgger:
                 new_actions_batch = self.actor.noiseless_action(actor_obs_batch).to(self.device)
 
                 l2_reg = [torch.sum(torch.square(w)) for w in self.actor.parameters() and self.critic.parameters()]
-                #l2_reg = [torch.sum(torch.square(w)) for w in self.actor.parameters()]
                 l2_reg_norm = sum(l2_reg) / 2
 
                 values_batch = self.critic.evaluate(actor_obs_batch)
@@ -240,7 +232,7 @@ class DAgger:
                 self.optimizer.zero_grad()
                 loss.backward()
                 self.optimizer.step()
-                self.scheduler.step()
+                #self.scheduler.step()
 
                 mean_loss += loss.item()
                 mean_action_loss += action_loss.item()

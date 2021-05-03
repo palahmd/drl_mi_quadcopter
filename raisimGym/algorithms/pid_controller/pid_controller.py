@@ -35,7 +35,7 @@ class PID:
         # outer PID controller for Position Control, runs with 20 Hz
         # input: error between target point and current state
         # output: desired acceleration, desired pitch and roll angles and u[0] for altitude control
-        if loopCount > 7:
+        if loopCount > 0:
             desAcc = self.pGain * errState[0:3] + self.dGain * errState[6:9]
             desState[3] = (1 / 9.81 * (desAcc[0] * np.sin(currState[5]) - desAcc[1] * np.cos(currState[5])))/4
             desState[4] = (1 / 9.81 * (desAcc[0] * np.cos(currState[5]) + desAcc[1] * np.sin(currState[5])))/4

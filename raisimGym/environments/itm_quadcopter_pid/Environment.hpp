@@ -11,7 +11,6 @@
 #include <cmath>
 #include "Eigen/Dense"
 #include "include/pidController.hpp"
-#include "include/pid_controller.cpp"
 
 
 namespace raisim {
@@ -73,9 +72,6 @@ namespace raisim {
             /// Reward coefficients
             rewards_.initializeFromConfigurationFile (cfg["reward"]);
 
-            /// PID Controller
-            pid_.setParameters(1.5, 200, 4, control_dt_, thrusts2TorquesAndForces_, hoverThrust_, true, true);
-
             /// visualize if it is the first environment
             if (visualizable_) {
                 server_ = std::make_unique<raisim::RaisimServer>(world_.get());
@@ -93,8 +89,6 @@ namespace raisim {
             //setNRandomStates(1, false, 2, 5);
             //setTarget(5.77, 5.77, 5.77);
             //setSingleRandomState(1, true, 2, 5);
-
-            pid_.setTargetPoint(targetPoint_);
 
             robot_->setState(gc_init_, gv_init_);
             updateObservation();
@@ -200,20 +194,23 @@ namespace raisim {
                 for (size_t j = 0; j<3; j++){
                     obDouble_[j + (i+1)*3] = bodyRot_(i,j);
                 }
+            }
+
+            for (size_t i = 0; i < 3; i++) {
                 obDouble_[i + 12] = bodyLinVel_[i];
+            }
+
+            for (size_t i = 0; i < 3; i++) {
                 obDouble_[i + 15] = bodyAngVel_[i];
             }
 
+            // quaternion is used for the pid controller
             for (size_t i = 0; i < 4; i++) {
                 obDouble_[i + 18] = quat_[i];
             }
-            for (size_t i = 0; i < obDim_-4; i++){
+            for (size_t i = 0; i < obDim_; i++){
                 obDouble_[i] *= (1 + generateNoise(0, 0.01));
             }
-
-            // quaternion for the python pid controller or pid control signal
-            Eigen::Vector4d pidSignal = pid_.smallAnglesControl(gc_, gv_, bodyRot_);
-            obDouble_.segment(18, 4) = pidSignal;
         }
 
         void observe(Eigen::Ref<EigenVec> ob) final {
@@ -396,7 +393,7 @@ namespace raisim {
         const double rotorPos_ = 0.17104913036744201, momConst_ = 0.016;
         const double rps_ = 2 * M_PI, rpm_ = rps_/60;
         const double g_ = 9.81, m_ = 1.727;
-        double hoverThrust_ = m_ * g_ / 4;
+        const double hoverThrust_ = m_ * g_ / 4;
 
         /// reward related
         raisim::Reward rewards_;
@@ -414,7 +411,7 @@ namespace raisim {
         int loopCount_ = 0;
 
         /// PID Controller
-        pidController pid_=pidController();
+        pidController pid_=(1.5, 200, 4)
     };
 }
 

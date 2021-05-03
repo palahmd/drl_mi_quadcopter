@@ -3,7 +3,6 @@ from raisimGymTorch.env.bin import itm_quadcopter
 from raisimGymTorch.env.RaisimGymVecEnv import RaisimGymVecEnv as VecEnv
 from raisimGymTorch.algo.pid_controller.pid_controller import PID
 from raisimGymTorch.algo.imitation_learning.dagger import DAgger
-from raisimGymTorch.algo.imitation_learning.dagger_critic import DAgger_Critic
 from raisimGymTorch.helper.raisim_gym_helper import ConfigurationSaver, tensorboard_launcher
 from raisimGymTorch.helper.env_helper.env_helper import helper
 import raisimGymTorch.algo.shared_modules.actor_critic as module
@@ -77,8 +76,9 @@ n_steps = math.floor(cfg['environment']['max_time'] / cfg['environment']['contro
 total_steps = n_steps * env.num_envs
 
 # Expert: PID Controller, target point and initial state to calculate target point
-expert = PID(1.5, 200, 4, ob_dim_expert, act_dim, cfg['environment']['control_dt'], 1.727)
+#expert = PID(1.5, 200, 4, ob_dim_expert, act_dim, cfg['environment']['control_dt'], 1.727)
 expert_actions = np.zeros(shape=(env.num_envs, act_dim), dtype="float32")
+
 targets = np.zeros(shape=(env.num_envs, ob_dim_expert), dtype="float32")
 vis_target = np.zeros(shape=(1, ob_dim_expert), dtype="float32")
 env_target = np.zeros(shape=(env.num_envs, act_dim), dtype="float32")
@@ -281,7 +281,7 @@ for update in range(2000):
     if skip_eval:
         update += last_update - last_checkpoint + 1
         skip_eval = False
-
+    duration = 0
     """ Actual training """
     for step in range(n_steps):
 
@@ -290,29 +290,16 @@ for update in range(2000):
         expert_obs += targets
         for i in range(0, env.num_envs):
             obs[i] = learner_obs[i][0:18]
+            expert_actions[i][:] = learner_obs[i][18:22]
         obs = helper.normalize_observation(obs)
-
-        # choose an expert action per environment
-        for i in range(0, env.num_envs):
-            expert_obs_env_i = expert_obs[i, :]
-            expert_actions[i, :] = expert.control(obs=expert_obs_env_i.reshape((ob_dim_expert, 1)),
-                                                  target=targets[i][0:12].reshape((12, 1)), loopCount=loopCount)
 
         # choose an expert action with beta-probability or learner action with (1-beta) probability
         actions = learner.observe(actor_obs=obs, expert_actions=expert_actions, env_helper=helper)
-
         reward, dones = env.step(actions)
         learner.step(rews=reward, dones=dones)
 
         dones_sum += sum(dones)
         reward_sum += sum(reward)
-
-        # for outter pid-control loop running five times slower
-        #if loopCount == 8:
-        #    loopCount = 0
-        #    if step >= n_steps/4:
-        #        loopCount = 3
-        #loopCount += 1
 
         expert_obs = env.observe()
 
@@ -328,11 +315,10 @@ for update in range(2000):
     for i in range(0, env.num_envs):
         obs[i] = learner_obs[i][0:18]
     obs = helper.normalize_observation(obs)
-    #critic_learner.train()
     mean_loss, mean_action_loss, mean_action_log_prob_loss, mean_value_loss = learner.update(obs=obs,
                                                                                              log_this_iteration=update % 10 == 0,
                                                                                              update=update)
-    #actor.distribution.enforce_minimum_std((torch.ones(4)).to(device))
+    actor.distribution.enforce_minimum_std((torch.ones(4)*0.2).to(device))
     tot_dones = learner.tot_dones
     failed_envs = learner.failed_envs
 
