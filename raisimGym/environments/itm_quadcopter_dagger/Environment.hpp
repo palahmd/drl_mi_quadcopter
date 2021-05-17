@@ -10,7 +10,8 @@
 #include "../../RaisimGymEnv.hpp"
 #include <cmath>
 #include "Eigen/Dense"
-
+#include "include/pidController.hpp"
+#include "include/pid_controller.cpp"
 
 
 namespace raisim {
@@ -20,7 +21,7 @@ namespace raisim {
     public:
 
         explicit ENVIRONMENT(const std::string &resourceDir, const Yaml::Node &cfg, bool visualizable) :
-                RaisimGymEnv(resourceDir, cfg), visualizable_(visualizable), gen_(rd())  {
+                RaisimGymEnv(resourceDir, cfg), visualizable_(visualizable) {
 
             /// add objects
             robot_ = world_->addArticulatedSystem(
@@ -49,7 +50,7 @@ namespace raisim {
 
             /// nominal configuration of quadcopter: [0]-[2]: center of mass, [3]-[6]: quanternions, [7]-[10]: rotors
             gc_init_ << 0.0, 0.0, 0.135, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
-            gv_init_ << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -700 * rpm_, 700 * rpm_, -700 * rpm_, 700 * rpm_;
+            gv_init_ << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -2000 * rpm_, 2000 * rpm_, -2000 * rpm_, 2000 * rpm_;
 
             /// initialize rotor thrusts_ and conversion matrix for generated forces and torques
             thrusts_.setZero(nRotors_);
@@ -72,6 +73,9 @@ namespace raisim {
             /// Reward coefficients
             rewards_.initializeFromConfigurationFile (cfg["reward"]);
 
+            /// PID Controller
+            pid_.setParameters(1.5, 50, 4.1, control_dt_, thrusts2TorquesAndForces_, hoverThrust_, true, true);
+
             /// visualize if it is the first environment
             if (visualizable_) {
                 server_ = std::make_unique<raisim::RaisimServer>(world_.get());
@@ -85,8 +89,13 @@ namespace raisim {
 
         void reset() final {
             /// set random target point or state
-            setNRandomTargets(10, 1);
+            //setNRandomTargetsAlternating(10, 1);
+            setNRandomTargets(10,1);
             //setNRandomStates(1, false, 2, 5);
+            //setTarget(5.77, 5.77, 5.77);
+            //setSingleRandomState(1, true, 2, 5);
+
+            pid_.setTargetPoint(targetPoint_);
 
             robot_->setState(gc_init_, gv_init_);
             updateObservation();
@@ -95,7 +104,20 @@ namespace raisim {
         }
 
         float step(const Eigen::Ref<EigenVec> &action) final {
-            /// scale action down to [-1, 1]. should work better than clipping, does at least for the pid controller
+            /*** If setSingleRandomTarget() is used, uncomment this if-loop. the runner file will take the target from
+             ** the single vis. environment with env.observe() and hand over the random target to all n env via a dummy
+             ** env.step(action). action is in this case a numpy vector containing n-times the single random target. The
+             ** following loop is then executed a single time to set the random target for all n environments. **/
+            if (singleRandomTarget) {
+                targetPoint_.head(3) = action.head(3).cast<double>();
+
+                robot_->setState(gc_init_, gv_init_);
+                updateObservation();
+
+                singleRandomTarget = false;
+
+                return 0.f;
+            }
 
             for (int i = 0; i < int(control_dt_ / simulation_dt_ + 1e-10); i++) {
                 if (server_) server_->lockVisualizationServerMutex();
@@ -113,7 +135,7 @@ namespace raisim {
                 if (server_) server_->unlockVisualizationServerMutex();
             }
 
-
+            /// scale action down to [-1, 1]. should work better than clipping, does at least for the pid controller
             controlThrusts_ = action.cast<double>();
 
             double max_scale = controlThrusts_.maxCoeff();
@@ -149,7 +171,7 @@ namespace raisim {
             rewards_.record("position", relativeAbsPosition);
             rewards_.record("relPosition", relPositionReward);
             rewards_.record("thrust", normedControlThrusts_.norm());
-            rewards_.record("orientation", std::acos(bodyRot_(2,1)));
+            rewards_.record("orientation", std::acos(worldRot_[8]));
             rewards_.record("angularVelocity", bodyAngVel_.norm());
 
             return rewards_.sum();
@@ -175,23 +197,20 @@ namespace raisim {
                 for (size_t j = 0; j<3; j++){
                     obDouble_[j + (i+1)*3] = bodyRot_(i,j);
                 }
-            }
-
-            for (size_t i = 0; i < 3; i++) {
                 obDouble_[i + 12] = bodyLinVel_[i];
-            }
-
-            for (size_t i = 0; i < 3; i++) {
                 obDouble_[i + 15] = bodyAngVel_[i];
             }
 
-            // quaternion is used for the pid controller
             for (size_t i = 0; i < 4; i++) {
                 obDouble_[i + 18] = quat_[i];
             }
-            for (size_t i = 0; i < obDim_; i++){
-                obDouble_[i] *= (1 + generateNoise(0, 0.02));
+            for (size_t i = 0; i < obDim_-4; i++){
+                obDouble_[i] *= (1 + generateNoise(0, 0.05));
             }
+
+            // quaternion for the python pid controller or pid control signal
+            Eigen::Vector4d pidSignal = pid_.smallAnglesControl(gc_, gv_, bodyRot_);
+            obDouble_.segment(18, 4) = pidSignal;
         }
 
         void observe(Eigen::Ref<EigenVec> ob) final {
@@ -251,12 +270,43 @@ namespace raisim {
             if (visualizable_) visPoint->setPosition(targetPoint_.head(3));
         }
 
+        void setSingleRandomTarget(double radius){
+            /// target will be updated everytime environment is reset
+            if (visualizable_) {
+                for(int i =0; i<3; i++) targetPoint_(i) = generateRandomValue(-1, 1);
+                targetPoint_.head(3) /= targetPoint_.head(3).norm();
+                targetPoint_.head(3) *= 10; // target point has distance of 10 m within a sphere
+                visPoint->setPosition(targetPoint_.head(3));
+            }
+            singleRandomTarget = true;
+        }
+
+        void setNRandomTargetsAlternating(double radius, int updateRate) {
+            if (updateTarget) {
+                int min_bound = std::min(0, sign);
+                int max_bound = std::max(0, sign);
+                for (int i = 0; i < 3; i++) targetPoint_(i) = generateRandomValue(min_bound, max_bound);
+                targetPoint_.head(3) /= targetPoint_.head(3).norm();
+                targetPoint_.head(3) *= radius; // target point has distance of 10 m within a sphere
+                if (visualizable_) visPoint->setPosition(targetPoint_.head(3));
+                updateTarget = false;
+                sign *= -1;
+            }
+
+            /// update target after specific amount of environment resets. updateRate is count in reversed order.
+            if (loopCount_ <= 0) {
+                loopCount_ = updateRate;
+                updateTarget = true;
+            }
+            loopCount_--;
+            nRandomTargets = true;
+        }
 
         void setNRandomTargets(double radius, int updateRate){
             if (updateTarget){
                 for(int i =0; i<3; i++) targetPoint_(i) = generateRandomValue(-1, 1);
                 targetPoint_.head(3) /= targetPoint_.head(3).norm();
-                targetPoint_.head(3) *= 10; // target point has distance of 10 m within a sphere
+                targetPoint_.head(3) *= radius; // target point has distance of 10 m within a sphere
                 if (visualizable_) visPoint->setPosition(targetPoint_.head(3));
                 updateTarget = false;
             }
@@ -270,6 +320,23 @@ namespace raisim {
             nRandomTargets = true;
         }
 
+        void setSingleRandomState(double pos, bool rot_bool, double vel, double angVel){
+            if (visualizable_) {
+                for (int i = 0; i < 3; i++) {
+                    gc_init_(i) = generateRandomValue(-pos, pos);
+                    gv_init_(i) = generateRandomValue(-vel, vel);
+                    gv_init_(i + 3) = generateRandomValue(-angVel, angVel);
+                }
+                if (rot_bool) {
+                    for (int i = 0; i < 4; i++) {
+                        gc_init_(i + 3) = generateRandomValue(-1, 1);
+                    }
+                    gc_.segment(3, 4) /= gc_.segment(3, 4).norm();
+                }
+            }
+            loopCount_ = 0;
+            singleRandomState = true;
+        }
 
         void setNRandomStates(double pos, bool rot_bool, double vel, double angVel){
             for (int i=0; i<3; i++){
@@ -331,6 +398,7 @@ namespace raisim {
 
         raisim::Mat<3,3> worldRot_;
         raisim::Vec<4> quat_;
+        raisim::Vec<3> euler_;
         Eigen::Vector3d bodyPos_, bodyLinVel_, bodyAngVel_;
         Eigen::Matrix3d bodyRot_;
 
@@ -348,26 +416,26 @@ namespace raisim {
         const double dragCoeff = 8.06428e-05;
         const double rps_ = 2 * M_PI, rpm_ = rps_/60;
         const double g_ = 9.81, m_ = 1.727;
-        const double hoverThrust_ = m_ * g_ / 4;
+        double hoverThrust_ = m_ * g_ / 4;
 
         /// reward related
         raisim::Reward rewards_;
         std::set<size_t> bodyIndices_;
         std::set<size_t> baseIndex_;
-        double terminalRewardCoeff_ = -5.;
+        double terminalRewardCoeff_ = -10.;
         double relativeAbsPosition;
         double relPositionReward;
 
         /// other variables
+        bool singleRandomTarget = false;
         bool nRandomTargets = false;
+        bool singleRandomState = false;
         bool updateTarget = false;
         int loopCount_ = 0;
-        double thrusts_before;
-
-        std::random_device rd;
-        std::mt19937 gen_;
+        int sign = 1;
 
         /// PID Controller
+        pidController pid_=pidController();
     };
 }
 

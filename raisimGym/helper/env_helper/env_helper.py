@@ -99,7 +99,7 @@ class helper:
         actor.architecture.load_state_dict(checkpoint['actor_architecture_state_dict'])
         actor.distribution.load_state_dict(checkpoint['actor_distribution_state_dict'])
         critic.architecture.load_state_dict(checkpoint['critic_architecture_state_dict'])
-        learner.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        #learner.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         #learner.scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
 
     def restart_from_last_checkpoint(self, env, saver, actor, critic, learner, update_num):
@@ -122,3 +122,9 @@ class helper:
         self.load_param(weight_path, actor, critic, learner, saver.data_dir, 'dagger', False)
 
         return update_modulo + 1
+
+    def identify_failed_envs(self, dones) -> object:
+        failed_envs = np.where(dones == 1)
+        index = list(dict.fromkeys(failed_envs[1].tolist()))
+
+        return  len(index), index

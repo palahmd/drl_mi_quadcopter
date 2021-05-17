@@ -181,3 +181,8 @@ class MultivariateGaussianDiagonalCovariance(nn.Module):
         current_std = self.std.detach()
         new_std = torch.max(current_std, min_std.detach()).detach()
         self.std.data = new_std
+
+    def enforce_maximum_std(self, max_std):
+        current_std = self.std.detach()
+        new_std = torch.min(current_std, max_std.detach()).detach()
+        self.std.data = new_std

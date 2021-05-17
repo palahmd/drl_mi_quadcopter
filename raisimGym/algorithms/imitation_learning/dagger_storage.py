@@ -58,8 +58,8 @@ class RolloutStorage:
             self.returns[step] = advantage + self.values[step]
 
         # Compute and normalize the advantages
-        self.advantages = self.returns - self.values
-        self.advantages = (self.advantages - self.advantages.mean()) / (self.advantages.std() + 1e-8)
+        #self.advantages = self.returns - self.values
+        #self.advantages = (self.advantages - self.advantages.mean()) / #(self.advantages.std() + 1e-8)
 
     def mini_batch_generator_shuffle(self, num_mini_batches):
         batch_size = self.num_envs * self.num_transitions_per_env
@@ -70,10 +70,9 @@ class RolloutStorage:
             expert_actions_batch = self.expert_actions.view(-1, self.expert_actions.size(-1))[indices]
             values_batch = self.values.view(-1, 1)[indices]
             returns_batch = self.returns.view(-1, 1)[indices]
-            advantages_batch = self.advantages.view(-1, 1)[indices]
             dones_batch = self.dones.view(-1, 1)[indices]
             yield actor_obs_batch, expert_actions_batch, \
-                  values_batch, advantages_batch, returns_batch, dones_batch
+                  values_batch, returns_batch, dones_batch
 
     def mini_batch_generator_inorder(self, num_mini_batches):
         batch_size = self.num_envs * self.num_transitions_per_env
@@ -83,7 +82,6 @@ class RolloutStorage:
             yield self.actor_obs.view(-1, *self.actor_obs.size()[2:])[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size], \
                 self.expert_actions.view(-1, self.expert_actions.size(-1))[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size], \
                 self.values.view(-1, 1)[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size], \
-                self.advantages.view(-1, 1)[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size], \
                 self.returns.view(-1, 1)[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size], \
                 self.dones.view(-1, 1)[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size]
 
@@ -99,21 +97,20 @@ class RolloutStorage:
                 self.rewards[transition][index[env]] = 0
 
 
-    def remove_failed_envs(self):
+    def filter_failed_envs(self, filter_envs = True):
         failed_envs = torch.where(self.dones == 1)
         failed_envs_index = list(dict.fromkeys(failed_envs[1].tolist()))
         num_failed_envs = len(failed_envs_index)
 
-        if num_failed_envs > 0:
+        if num_failed_envs > 0 and filter_envs:
             compl_envs = torch.where(self.dones == 0)
             compl_envs_index = [env for env in list(dict.fromkeys(compl_envs[1].tolist())) if env not in failed_envs_index]
-            for env in range(num_failed_envs-1):
+            for env in range(num_failed_envs):
                 rand_num = random.randint(0, len(compl_envs_index)-1)
                 for transition in range(self.num_transitions_per_env):
                     self.actor_obs[transition][failed_envs_index[env]] = self.actor_obs[transition][compl_envs_index[rand_num]]
                     self.expert_actions[transition][failed_envs_index[env]] = self.expert_actions[transition][compl_envs_index[rand_num]]
                     self.values[transition][failed_envs_index[env]] = self.values[transition][compl_envs_index[rand_num]]
-                    self.advantages[transition][failed_envs_index[env]] = self.advantages[transition][compl_envs_index[rand_num]]
                     self.returns[transition][failed_envs_index[env]] =self.returns[transition][compl_envs_index[rand_num]]
                     self.dones[transition][failed_envs_index[env]] = self.dones[transition][compl_envs_index[rand_num]]
 

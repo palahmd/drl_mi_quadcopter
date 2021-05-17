@@ -67,9 +67,11 @@ class PPO:
         self.actions = None
         self.actions_log_prob = None
         self.actor_obs = None
+        self.expert_actions = None
         self.actions_log_prob = torch.zeros((self.num_envs, 1)).to(self.device)
 
-    def observe(self, actor_obs):
+    def observe(self, expert_actions, actor_obs):
+        self.expert_actions = torch.from_numpy(expert_actions).to(self.device)
         self.actor_obs = actor_obs
         self.actions, self.actions_log_prob = self.actor.sample(torch.from_numpy(actor_obs).to(self.device))
         if self.deterministic_policy:
@@ -79,7 +81,7 @@ class PPO:
 
     def step(self, value_obs, rews, dones):
         values = self.critic.predict(torch.from_numpy(value_obs).to(self.device))
-        self.storage.add_transitions(self.actor_obs, value_obs, self.actions, rews, dones, values,
+        self.storage.add_transitions(self.actor_obs, value_obs, self.actions, self.expert_actions, rews, dones, values,
                                      self.actions_log_prob)
 
     def update(self, actor_obs, value_obs, log_this_iteration, update):
@@ -118,18 +120,18 @@ class PPO:
         mean_returns = 0
         mean_advantages = 0
         for epoch in range(self.num_learning_epochs):
-            for actor_obs_batch, critic_obs_batch, actions_batch, target_values_batch, advantages_batch, returns_batch, old_actions_log_prob_batch \
+            for actor_obs_batch, critic_obs_batch, actions_batch, expert_actions_batch, target_values_batch, advantages_batch, returns_batch, old_actions_log_prob_batch \
                     in self.batch_sampler(self.num_mini_batches):
 
                 actions_log_prob_batch, entropy_batch = self.actor.evaluate(actor_obs_batch, actions_batch)
                 value_batch = self.critic.evaluate(critic_obs_batch)
+                expert_log, _ = self.actor.evaluate(actor_obs_batch, expert_actions_batch)
 
-                # Surrogate loss
-                if self.deterministic_policy:
-                    new_actions_batch = self.actor.noiseless_action(actor_obs_batch).to(self.device)
-                    ratio = torch.mean(new_actions_batch, dim=1) / torch.mean(actions_batch, dim=1)
-                else:
-                    ratio = torch.exp(actions_log_prob_batch - torch.squeeze(old_actions_log_prob_batch))
+                l2_reg = [torch.sum(torch.square(w)) for w in self.actor.parameters() and self.critic.parameters()]
+                l2_reg_norm = sum(l2_reg) / 2
+                l2_reg_loss = 0.0001 * l2_reg_norm
+
+                ratio = torch.exp(actions_log_prob_batch - torch.squeeze(old_actions_log_prob_batch))
 
                 surrogate = -torch.squeeze(advantages_batch) * ratio
                 surrogate_clipped = -torch.squeeze(advantages_batch) * torch.clamp(ratio, 1.0 - self.clip_param,
@@ -146,7 +148,10 @@ class PPO:
                 else:
                     value_loss = (returns_batch - value_batch).pow(2).mean()
 
-                loss = surrogate_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy_batch.mean()
+                bc_loss = -expert_log.mean()
+
+                loss = surrogate_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy_batch.mean() \
+                       + 0.0 * bc_loss + l2_reg_loss
 
                 # Gradient step
                 self.optimizer.zero_grad()

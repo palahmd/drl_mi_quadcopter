@@ -20,7 +20,7 @@ namespace raisim {
     public:
 
         explicit ENVIRONMENT(const std::string &resourceDir, const Yaml::Node &cfg, bool visualizable) :
-                RaisimGymEnv(resourceDir, cfg), visualizable_(visualizable), gen_(rd())  {
+                RaisimGymEnv(resourceDir, cfg), visualizable_(visualizable) {
 
             /// add objects
             robot_ = world_->addArticulatedSystem(
@@ -49,7 +49,7 @@ namespace raisim {
 
             /// nominal configuration of quadcopter: [0]-[2]: center of mass, [3]-[6]: quanternions, [7]-[10]: rotors
             gc_init_ << 0.0, 0.0, 0.135, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
-            gv_init_ << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -700 * rpm_, 700 * rpm_, -700 * rpm_, 700 * rpm_;
+            gv_init_ << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -2000 * rpm_, 2000 * rpm_, -2000 * rpm_, 2000 * rpm_;
 
             /// initialize rotor thrusts_ and conversion matrix for generated forces and torques
             thrusts_.setZero(nRotors_);
@@ -95,8 +95,6 @@ namespace raisim {
         }
 
         float step(const Eigen::Ref<EigenVec> &action) final {
-            /// scale action down to [-1, 1]. should work better than clipping, does at least for the pid controller
-
             for (int i = 0; i < int(control_dt_ / simulation_dt_ + 1e-10); i++) {
                 if (server_) server_->lockVisualizationServerMutex();
                 /// delay rotor thrusts with a simple motor model
@@ -113,7 +111,7 @@ namespace raisim {
                 if (server_) server_->unlockVisualizationServerMutex();
             }
 
-
+            /// scale action down to [-1, 1]. should work better than clipping, does at least for the pid controller
             controlThrusts_ = action.cast<double>();
 
             double max_scale = controlThrusts_.maxCoeff();
@@ -137,7 +135,7 @@ namespace raisim {
 
             updateObservation();
 
-            relativeAbsPosition = (targetPoint_.head(3) - bodyPos_).norm();
+            relativeAbsPosition = std::sqrt((targetPoint_.head(3) - bodyPos_).norm());
 
             if (relativeAbsPosition < 1){
                 relPositionReward = 1 - relativeAbsPosition;
@@ -165,6 +163,7 @@ namespace raisim {
             bodyLinVel_ = bodyRot_ * gv_.segment(0,3);
             bodyAngVel_ = bodyRot_ * gv_.segment(3,3);
             robot_->getBaseOrientation(quat_);
+            calculateEulerAngles();
 
             /// observation vector (later for RL-Algorithm)
             for (size_t i = 0; i < 3; i++) {
@@ -190,7 +189,7 @@ namespace raisim {
                 obDouble_[i + 18] = quat_[i];
             }
             for (size_t i = 0; i < obDim_; i++){
-                obDouble_[i] *= (1 + generateNoise(0, 0.02));
+                obDouble_[i] *= (1 + generateNoise(0, 0.01));
             }
         }
 
@@ -362,10 +361,6 @@ namespace raisim {
         bool nRandomTargets = false;
         bool updateTarget = false;
         int loopCount_ = 0;
-        double thrusts_before;
-
-        std::random_device rd;
-        std::mt19937 gen_;
 
         /// PID Controller
     };
