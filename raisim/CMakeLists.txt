@@ -1,10 +1,18 @@
 ## CMake File for compiling raisim scripts
 
 cmake_minimum_required(VERSION 3.10)
-project(Quadcopter LANGUAGES CXX)
+project(Quadcopter LANGUAGES C CXX)
+
+# for macOS
+set(CMAKE_MACOSX_RPATH 1)
+
+# set compiler standard
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99 -DEXT_DEP -fdiagnostics-show-option")
 
 # Add dependencies
-
+list(APPEND CMAKE_PREFIX_PATH "/home/arnold/Develop/raisimLib/build")
 find_package(raisim CONFIG REQUIRED)
 find_package(Eigen3 REQUIRED)
 include_directories (${EIGEN3_INCLUDE_DIRS})
