@@ -23,13 +23,22 @@
 #include <acados_sim_solver_quadrotor_q.h>
 #include <acados_solver_quadrotor_q.h>
 
+
 class MPCAcadosController
 {
 public:
     MPCAcadosController();
     ~MPCAcadosController();
+    void solvingACADOS(Eigen::VectorXd current_state, Eigen::MatrixXd ref);
+    void setTargetPoint(double x, double y, double z);
+
+    Eigen::VectorXd targetPoint;
+    double robot_command[4];
 
 private:
+    Eigen::Vector3d ToEulerAngles(Eigen::VectorXd q);
+
+    Eigen::Vector3d eulerAngles, angVel_Body, desAcc;
     /* ACADOS */
     nlp_solver_capsule *acados_ocp_capsule;
     int acados_status;
@@ -40,5 +49,6 @@ private:
     int time_horizon;
     int num_states;
     int num_controls;
+    double robot_current_state[10];
 };
 #endif /* _MPC_CONTROLLER_HPP_ */

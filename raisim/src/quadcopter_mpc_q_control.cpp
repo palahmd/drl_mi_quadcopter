@@ -52,5 +52,41 @@ int main(int argc, char *argv[])
         momConst, -momConst, momConst, -momConst;
 
     // MPC controller
-    MPCAcadosController mpc_controller();
+    MPCAcadosController mpc_controller;
+    mpc_controller.setTargetPoint(1.0, 0.0, 0.0);
+
+    // visualize target position
+    auto visPoint = server.addVisualSphere("visPoint", 0.25, 0, 0.8, 0);
+    visPoint->setPosition(mpc_controller.targetPoint.head(3));
+
+    // launch raisim server for visualization. Can be visualized on raisimUnity
+    server.launchServer();
+    server.focusOn(robot);
+    raisim::MSLEEP(1000); // freeze for 1 sec in the beginning
+
+    /// Integration loop
+    auto begin = std::chrono::steady_clock::now();
+    loopCount = 5;
+
+    for (i = 0; i < 10000; i++) {
+        updateState();
+        
+        // mpc_controller.solvingACADOS();
+        applyThrusts();
+
+        // Loop count for PID controller -> Position Controller controls at every 5th time step
+        if (loopCount > 4){
+            loopCount = 0;
+        }
+        loopCount++;
+        raisim::MSLEEP(10);
+        server.integrateWorldThreadSafe();
+    }
+
+
+    /// Benchmarking the algorithms within the integration loop
+    auto end = std::chrono::steady_clock::now();
+    raisim::print_timediff(i,begin,end);
+
+    server.killServer();
 }
