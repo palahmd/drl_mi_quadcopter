@@ -8,6 +8,7 @@
 
 #include "quadcopterInit.hpp"
 #include "pid_controller.cpp"
+/* #include "pidController.hpp" */
 #include "benchmarkCommon.hpp"
 
 
