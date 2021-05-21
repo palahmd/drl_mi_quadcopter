@@ -4,6 +4,7 @@
 // This header initializes all dynamics and model properties and provides basic functions
 #ifndef _QUADCOPTER_INIT_HPP_
 #define _QUADCOPTER_INIT_HPP_
+
 #include "Eigen/Dense"
 #include "benchmarkCommon.hpp"
 #include "iostream"
