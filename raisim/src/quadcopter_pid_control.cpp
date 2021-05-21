@@ -23,7 +23,7 @@ int main(int argc, char *argv[]) {
     /// create raisim objects
     ground = world.addGround();
     robot = world.addArticulatedSystem(
-            binaryPath.getDirectory() + "\\rsc\\ITM-quadcopter\\urdf\\ITM-quadcopter.urdf");
+                                       binaryPath.getDirectory() + "\\rsc\\ITM-quadcopter\\urdf\\ITM-quadcopter.urdf");
     robot->setName("Quaddy");
     robot->setIntegrationScheme(raisim::ArticulatedSystem::IntegrationScheme::RUNGE_KUTTA_4);
 
@@ -45,9 +45,9 @@ int main(int argc, char *argv[]) {
     /// initialize rotor thrusts and conversion matrix for generated forces and torques
     thrusts.setZero(nRotors);
     thrusts2TorquesAndForces << 1, 1, 1, 1,
-            rotorPos, -rotorPos, -rotorPos, rotorPos,
-            -rotorPos, -rotorPos, rotorPos, rotorPos,
-            momConst, -momConst, momConst, -momConst;
+                             rotorPos, -rotorPos, -rotorPos, rotorPos,
+                             -rotorPos, -rotorPos, rotorPos, rotorPos,
+                             momConst, -momConst, momConst, -momConst;
 
     /// set PID Controller with desired Position for waypoint tracking
     pidController pid(2, 20, 6);

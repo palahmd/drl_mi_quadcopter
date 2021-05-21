@@ -52,7 +52,7 @@ target_link_libraries(sim_shared_lib acados hpipm blasfeo)
 
 
 add_executable(pid_control_quadcopter src/quadcopter_pid_control.cpp)
-target_link_libraries(pid_control_quadcopter raisim pthread )
+target_link_libraries(pid_control_quadcopter raisim::raisim pthread )
 target_include_directories(pid_control_quadcopter PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 # add_executable(gyroscope_effect src/gyroscopic_effect.cpp)
