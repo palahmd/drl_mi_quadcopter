@@ -32,16 +32,28 @@ include_directories(./include)
 # load acados libs
 link_directories($ENV{ACADOS_SOURCE_DIR}/lib)
 
-file(GLOB ocp_solver
+file(GLOB ocp_solver_q
         ./acados_code/acados_solver_quadrotor_q.c
         )
 
-file(GLOB casadi_fun
+file(GLOB casadi_fun_q
         ./acados_code/quadrotor_q_model/quadrotor_q_expl_ode_fun.c
         ./acados_code/quadrotor_q_model/quadrotor_q_expl_vde_forw.c)
 
-file(GLOB sim_solver
+file(GLOB sim_solver_q
         ./acados_code/acados_sim_solver_quadrotor_q.c
+        )
+
+file(GLOB ocp_solver
+        ./acados_code/acados_solver_quadrotor.c
+        )
+
+file(GLOB casadi_fun
+        ./acados_code/quadrotor_model/quadrotor_expl_ode_fun.c
+        ./acados_code/quadrotor_model/quadrotor_expl_vde_forw.c)
+
+file(GLOB sim_solver
+        ./acados_code/acados_sim_solver_quadrotor.c
         )
 
 add_library(ocp_shared_lib SHARED ${ocp_solver} ${casadi_fun} )

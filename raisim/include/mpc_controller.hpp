@@ -20,25 +20,31 @@
 // acados
 #include <acados/utils/math.h>
 #include <acados_c/ocp_nlp_interface.h>
-#include <acados_sim_solver_quadrotor_q.h>
-#include <acados_solver_quadrotor_q.h>
+// #include <acados_sim_solver_quadrotor_q.h>
+// #include <acados_solver_quadrotor_q.h>
+#include <acados_sim_solver_quadrotor.h>
+#include <acados_solver_quadrotor.h>
 
 
 class MPCAcadosController
 {
 public:
-    MPCAcadosController();
+    MPCAcadosController(double m, double dt);
     ~MPCAcadosController();
-    void solvingACADOS(Eigen::VectorXd current_state, Eigen::MatrixXd ref);
+    void solvingACADOS(Eigen::Matrix4d rot, Eigen::Vector4d& thrusts); // Eigen::VectorXd current_state, Eigen::MatrixXd ref
     void setTargetPoint(double x, double y, double z);
 
     Eigen::VectorXd targetPoint;
     double robot_command[4];
+    Eigen::MatrixXd trajectory_reference;
+    Eigen::VectorXd currentState;
 
 private:
     Eigen::Vector3d ToEulerAngles(Eigen::VectorXd q);
-
-    Eigen::Vector3d eulerAngles, angVel_Body, desAcc;
+    Eigen::Vector4d u, controlThrusts;
+    Eigen::Vector3d eulerAngles;
+    double timeStep;
+    
     /* ACADOS */
     nlp_solver_capsule *acados_ocp_capsule;
     int acados_status;
@@ -49,6 +55,7 @@ private:
     int time_horizon;
     int num_states;
     int num_controls;
-    double robot_current_state[10];
+    double robot_current_state[10]; // x, y, z, qw, qx, qy, qz, vx, vy, vz
+    double mass; 
 };
 #endif /* _MPC_CONTROLLER_HPP_ */
