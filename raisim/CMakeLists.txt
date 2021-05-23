@@ -62,6 +62,12 @@ target_link_libraries(ocp_shared_lib acados hpipm blasfeo)
 add_library(sim_shared_lib SHARED ${sim_solver} ${casadi_fun})
 target_link_libraries(sim_shared_lib acados hpipm blasfeo)
 
+add_library(ocp_shared_lib_q SHARED ${ocp_solver_q} ${casadi_fun_q} )
+target_link_libraries(ocp_shared_lib_q acados hpipm blasfeo)
+
+add_library(sim_shared_lib_q SHARED ${sim_solver_q} ${casadi_fun_q})
+target_link_libraries(sim_shared_lib_q acados hpipm blasfeo)
+
 
 add_executable(pid_control_quadcopter src/quadcopter_pid_control.cpp)
 target_link_libraries(pid_control_quadcopter raisim::raisim pthread )
@@ -71,5 +77,8 @@ target_include_directories(pid_control_quadcopter PUBLIC ${CMAKE_CURRENT_SOURCE_
 # target_link_libraries(gyroscope_effect PUBLIC raisim::raisim pthread)
 # target_include_directories(gyroscope_effect PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-add_executable(mpc_control_quadrotor src/quadcopter_mpc_q_control.cpp src/mpc_controller.cpp)
+add_executable(mpc_control_quadrotor src/quadcopter_mpc_control.cpp src/mpc_controller.cpp)
 target_link_libraries(mpc_control_quadrotor raisim::raisim pthread ocp_shared_lib sim_shared_lib)
+
+add_executable(mpc_q_control_quadrotor src/quadcopter_mpc_q_control.cpp src/mpc_q_controller.cpp)
+target_link_libraries(mpc_q_control_quadrotor raisim::raisim pthread ocp_shared_lib_q sim_shared_lib_q)

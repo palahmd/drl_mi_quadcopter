@@ -51,7 +51,7 @@ int main(int argc, char *argv[]) {
 
     /// set PID Controller with desired Position for waypoint tracking
     pidController pid(2, 20, 6);
-    pid.setTargetPoint(100, 10, 10);
+    pid.setTargetPoint(0.0, 0.0, 1.0);
 
     /// visualize target position
     auto visPoint = server.addVisualSphere("visPoint", 0.25, 0, 0.8, 0);

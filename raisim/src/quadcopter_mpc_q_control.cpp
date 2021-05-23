@@ -6,7 +6,7 @@
  * @Note: Note
  */
 
-#include "mpc_controller.hpp"
+#include "mpc_q_controller.hpp"
 #include "quadcopterInit.hpp"
 
 Eigen::Vector3d ToEulerAngles(Eigen::VectorXd& q) {
@@ -79,7 +79,7 @@ int main(int argc, char *argv[])
 
     // MPC controller
     MPCAcadosController mpc_controller(1.727, 0.01);
-    mpc_controller.setTargetPoint(0.0, 0.0, 0.5);
+    mpc_controller.setTargetPoint(0.0, 0.0, 0.8);
 
     // visualize target position
     auto visPoint = server.addVisualSphere("visPoint", 0.25, 0, 0.8, 0);
@@ -94,17 +94,14 @@ int main(int argc, char *argv[])
     auto begin = std::chrono::steady_clock::now();
     loopCount = 5;
 
-    for (i = 0; i < 10000; i++) {
+    for (i = 0; i < 1000; i++) {
         updateState();
-        Eigen::Vector3d eulerAngles = ToEulerAngles(ob_q);
-        std::cout << eulerAngles << std::endl;
-        mpc_controller.currentState << pos.e(), eulerAngles, linVel_W.e();
-        // mpc_controller.currentState << pos.e(), ob_q[9], ob_q[10], ob_q[11], ob_q[12], linVel_W.e();
-        // mpc_controller.solvingACADOS(thrusts2TorquesAndForces, thrusts);
-        // applyThrusts();
+        mpc_controller.currentState << pos.e(), ob_q[9], ob_q[10], ob_q[11], ob_q[12], linVel_W.e();
+        mpc_controller.solvingACADOS(thrusts2TorquesAndForces, thrusts);
+        applyThrusts();
 
-        // raisim::MSLEEP(10);
-        // server.integrateWorldThreadSafe();
+        raisim::MSLEEP(10);
+        server.integrateWorldThreadSafe();
     }
 
 

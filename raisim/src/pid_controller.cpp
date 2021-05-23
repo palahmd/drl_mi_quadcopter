@@ -46,6 +46,8 @@ void pidController::smallAnglesControl() {
     u[2] = inertiaDiagVec[1] * 81 * errState[4] + 2 * inertiaDiagVec[1] * 9 * errState[10];
     u[3] = inertiaDiagVec[2] * 81 * errState[5] + 2 * inertiaDiagVec[2] * 9 * errState[11];
 
+    std::cout <<"u:" << u << std::endl;
+
     /** Motor Model for motor i:
      **         time_constant_up = 0.0125 sec
      **         time_const_down = 0.025 sec
@@ -62,6 +64,8 @@ void pidController::smallAnglesControl() {
      ** The control thrust from this time step will be partly applied in the next time step
      ** due to the rotor velocity change delay in the motor model **/
     controlThrusts = thrusts2TorquesAndForces.inverse() * u;
+
+    std::cout << "controlThrusts:" << controlThrusts << std::endl;
 
     /// scale controlThrusts and avoid thrusts out of range: 0.5 - 1.5 * hoverThrust
     double max_scale = controlThrusts.maxCoeff();

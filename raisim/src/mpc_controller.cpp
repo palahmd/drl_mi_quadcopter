@@ -10,16 +10,6 @@
 MPCAcadosController::MPCAcadosController(double m, double dt): timeStep(dt), mass(m)
 {
     /* init ACADOS */
-    // acados_ocp_capsule = quadrotor_q_acados_create_capsule();
-    // acados_status = quadrotor_q_acados_create(acados_ocp_capsule);
-    // if (acados_status)
-    // {
-    //     std::cout << "Cannot create the ACADOS solver!!!" << std::endl;
-    // }
-    // nlp_config = quadrotor_q_acados_get_nlp_config(acados_ocp_capsule);
-    // nlp_dims = quadrotor_q_acados_get_nlp_dims(acados_ocp_capsule);
-    // nlp_in = quadrotor_q_acados_get_nlp_in(acados_ocp_capsule);
-    // nlp_out = quadrotor_q_acados_get_nlp_out(acados_ocp_capsule);
 
     acados_ocp_capsule = quadrotor_acados_create_capsule();
     acados_status = quadrotor_acados_create(acados_ocp_capsule);
@@ -37,8 +27,13 @@ MPCAcadosController::MPCAcadosController(double m, double dt): timeStep(dt), mas
     num_states = *nlp_dims->nx;
     num_controls = *nlp_dims->nu;
 
+    std::cout << time_horizon << num_states << num_controls << std::endl;
+
     trajectory_reference = Eigen::MatrixXd::Zero(time_horizon + 1, num_states + num_controls);
-    currentState.setZero(10);
+    // currentState.setZero(10);
+    currentState.setZero(9);
+
+    hoverThrust = mass * 9.81 / 4;
 }
 
 MPCAcadosController::~MPCAcadosController()
@@ -47,13 +42,13 @@ MPCAcadosController::~MPCAcadosController()
 
 void MPCAcadosController::solvingACADOS(Eigen::Matrix4d rot, Eigen::Vector4d& thrusts) //Eigen::VectorXd current_state, Eigen::MatrixXd ref
 {
-    if (sizeof(robot_current_state)/sizeof(double) != currentState.size())
+    if (sizeof(robot_current_state) / sizeof(double) != currentState.size())
     {
         std::cout << "current state size error" << std::endl;
     }
     for (int i = 0; i < currentState.size(); i++)
     {
-        robot_current_state[i] = currentState(i);     
+        robot_current_state[i] = currentState(i);
     }
 
     ocp_nlp_constraints_model_set(nlp_config, nlp_dims, nlp_in, 0, "lbx", robot_current_state);
@@ -89,36 +84,60 @@ void MPCAcadosController::solvingACADOS(Eigen::Matrix4d rot, Eigen::Vector4d& th
     {
         robot_command[0] = 0.0;
         robot_command[1] = 0.0;
-        robot_command[2] = 0.0;
-        robot_command[3] = 9.8066;
+        robot_command[2] = 9.81;
     }
     else
         ocp_nlp_out_get(nlp_config, nlp_dims, nlp_out, 0, "u", &robot_command);
 
     Eigen::Vector3d rpy;
     rpy = ToEulerAngles(currentState.segment(3, 4));
-    u[0] = robot_command[3] * mass;
-    u[1] = robot_command[0] * timeStep + rpy[0];
-    u[2] = robot_command[1] * timeStep + rpy[1];
-    u[3] = robot_command[2] * timeStep + rpy[2];
-    std::cout << u << std::endl;
+    std::cout << "rpy = " << rpy << std::endl;
+    u[0] = robot_command[2] * 9.81/9.8066*1.1;
+    // u[1] = robot_command[1];
+    // u[2] = robot_command[0];
+    // u[3] = 0.0;
+    std::cout << "u:" << u << std::endl;
 
+    /** inner PD controller for Attitude Control, runs with 100 Hz
+     ** input: desired acceleration and error between desired state and current state
+     ** output: u[1] - u[3] for attitude control **/
+    Eigen::Vector3d desState, errState;
+    desState << robot_command[0], robot_command[1], 0.0;
+    errState = desState - currentState.segment(3, 3);
+
+    u[1] = inertiaDiagVec[0] * 81 * errState[0] + 2 * inertiaDiagVec[0] * 9 * errState[0];
+    u[2] = inertiaDiagVec[1] * 81 * errState[1] + 2 * inertiaDiagVec[1] * 9 * errState[1];
+    u[3] = inertiaDiagVec[2] * 81 * errState[2] + 2 * inertiaDiagVec[2] * 9 * errState[2];
+    
     /** Motor Model for motor i:
      **         time_constant_up = 0.0125 sec
      **         time_const_down = 0.025 sec
      **         thrust(t) = thrust(t-1) + (controlThrust(t-1) - thrust(t-1)) * timeStep/time_constant **/
-    for (int i = 0; i<4; i++){
-        if (thrusts[i]<controlThrusts[i]) {  // time constant for increasing rotor speed
+    for (int i = 0; i < 4; i++) {
+        if (thrusts[i] < controlThrusts[i]) { // time constant for increasing rotor speed
             thrusts[i] = thrusts[i] + (controlThrusts[i] - thrusts[i]) * timeStep / 0.0125;
-        } else if (thrusts[i]>controlThrusts[i]){   // time constant for decreasing rotor speed
+        } else if (thrusts[i] > controlThrusts[i]) { // time constant for decreasing rotor speed
             thrusts[i] = thrusts[i] + (controlThrusts[i] - thrusts[i]) * timeStep / 0.025;
         }
     }
 
+    std::cout << "u = " << u << std::endl;
+
     controlThrusts = rot.inverse() * u;
-    // std::cout << thrusts << std::endl;
+    std::cout << "controlThrusts:" << controlThrusts << std::endl;
+
+    double max_scale = controlThrusts.maxCoeff();
+    if (max_scale > 1.5 * hoverThrust) {
+        controlThrusts = 1.5 / max_scale * hoverThrust * controlThrusts;
+    }
+    for (int i = 0; i < 4; i++) {
+        if (controlThrusts[i] < 0.5 * hoverThrust) {
+            controlThrusts[i] = 0.5 * hoverThrust;
+        }
+    }
 
 }
+
 
 void MPCAcadosController::setTargetPoint(double x, double y, double z)
 {
@@ -130,17 +149,17 @@ void MPCAcadosController::setTargetPoint(double x, double y, double z)
         trajectory_reference(i, 0) = x;
         trajectory_reference(i, 1) = y;
         trajectory_reference(i, 2) = z;
+        // atiltitude
         trajectory_reference(i, 3) = 0.0;
         trajectory_reference(i, 4) = 0.0;
         trajectory_reference(i, 5) = 0.0;
         trajectory_reference(i, 6) = 0.0;
         trajectory_reference(i, 7) = 0.0;
         trajectory_reference(i, 8) = 0.0;
-         // control
+        // control
         trajectory_reference(i, 9) = 0.0;
         trajectory_reference(i, 10) = 0.0;
-        trajectory_reference(i, 11) = 0.0;
-        trajectory_reference(i, 12) = 9.8066;
+        trajectory_reference(i, 11) = 9.8066;
         // trajectory_reference(i, 3) = 1.0;
         // trajectory_reference(i, 4) = 0.0;
         // trajectory_reference(i, 5) = 0.0;
