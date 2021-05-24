@@ -50,7 +50,7 @@ namespace raisim {
 
             /// nominal configuration of quadcopter: [0]-[2]: center of mass, [3]-[6]: quanternions, [7]-[10]: rotors
             gc_init_ << 0.0, 0.0, 0.135, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
-            gv_init_ << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -2000 * rpm_, 2000 * rpm_, -2000 * rpm_, 2000 * rpm_;
+            gv_init_ << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -700 * rpm_, 700 * rpm_, -700 * rpm_, 700 * rpm_;
 
             /// initialize rotor thrusts_ and conversion matrix for generated forces and torques
             thrusts_.setZero(nRotors_);
@@ -74,7 +74,7 @@ namespace raisim {
             rewards_.initializeFromConfigurationFile (cfg["reward"]);
 
             /// PID Controller
-            pid_.setParameters(1.5, 50, 4.1, control_dt_, thrusts2TorquesAndForces_, hoverThrust_, true, true);
+            pid_.setParameters(1.9, 250, 4.1, control_dt_, thrusts2TorquesAndForces_, hoverThrust_, true, true);
 
             /// visualize if it is the first environment
             if (visualizable_) {
@@ -204,10 +204,10 @@ namespace raisim {
             for (size_t i = 0; i < 4; i++) {
                 obDouble_[i + 18] = quat_[i];
             }
+            obDouble_ -= targetPoint_;
             for (size_t i = 0; i < obDim_-4; i++){
                 obDouble_[i] *= (1 + generateNoise(0, 0.05));
             }
-
             // quaternion for the python pid controller or pid control signal
             Eigen::Vector4d pidSignal = pid_.smallAnglesControl(gc_, gv_, bodyRot_);
             obDouble_.segment(18, 4) = pidSignal;
@@ -215,7 +215,6 @@ namespace raisim {
 
         void observe(Eigen::Ref<EigenVec> ob) final {
             /// convert it to float
-            obDouble_ -= targetPoint_;
             ob = obDouble_.cast<float>();
         }
 

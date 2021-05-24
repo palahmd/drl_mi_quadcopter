@@ -85,7 +85,7 @@ namespace raisim {
 
         void reset() final {
             /// set random target point or state
-            setNRandomTargets(10, 1);
+            setNRandomTargets(15, 1);
             //setNRandomStates(1, false, 2, 5);
 
             robot_->setState(gc_init_, gv_init_);
@@ -188,6 +188,7 @@ namespace raisim {
             for (size_t i = 0; i < 4; i++) {
                 obDouble_[i + 18] = quat_[i];
             }
+            obDouble_ -= targetPoint_;
             for (size_t i = 0; i < obDim_; i++){
                 obDouble_[i] *= (1 + generateNoise(0, 0.01));
             }
@@ -195,7 +196,6 @@ namespace raisim {
 
         void observe(Eigen::Ref<EigenVec> ob) final {
             /// convert it to float
-            obDouble_ -= targetPoint_;
             ob = obDouble_.cast<float>();
         }
 
@@ -328,8 +328,9 @@ namespace raisim {
         Eigen::VectorXd obDouble_, targetPoint_;
         Eigen::Vector4d actionMean_, actionStd_;
 
-        raisim::Mat<3,3> worldRot_;
+        raisim::Mat<3,3> worldRot_, rotE;
         raisim::Vec<4> quat_;
+        raisim::Vec<3> velE, posE, angE;
         Eigen::Vector3d bodyPos_, bodyLinVel_, bodyAngVel_;
         Eigen::Matrix3d bodyRot_;
 

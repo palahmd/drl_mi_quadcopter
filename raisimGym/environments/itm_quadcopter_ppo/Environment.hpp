@@ -29,7 +29,7 @@ namespace raisim {
                     resourceDir_ + "/ITM-quadcopter/urdf/ITM-quadcopter.urdf");
             robot_->setName("ITM-Quadcopter");
             robot_->setIntegrationScheme(raisim::ArticulatedSystem::IntegrationScheme::RUNGE_KUTTA_4);
-            world_->addGround(-15);
+            world_->addGround(-20);
 
             /// get robot data
             gcDim_ = robot_->getGeneralizedCoordinateDim();
@@ -160,13 +160,22 @@ namespace raisim {
             updateObservation();
 
             relativeAbsPosition = (targetPoint_.head(3) - bodyPos_).norm();
-
             if (relativeAbsPosition < 1){
-                relPositionReward = 1 - relativeAbsPosition;
+            	relativeAbsPosition *= relativeAbsPosition;
+            }
+            else{
+            	relativeAbsPosition *= 2;
+	    }
+
+	    /*
+            if (relativeAbsPosition < 1){
+                relPositionReward = 1 / (0.5+relativeAbsPosition);
             }
             else{
                 relPositionReward = 0;
-            }
+            }*/
+            relPositionReward = 1 / (0.5+relativeAbsPosition);
+
 
             double absEulerAngles = std::acos(worldRot_[8]);
 
@@ -206,6 +215,7 @@ namespace raisim {
             for (size_t i = 0; i < 4; i++) {
                 obDouble_[i + 18] = quat_[i];
             }
+            obDouble_ -= targetPoint_;
             for (size_t i = 0; i < obDim_-4; i++){
                 obDouble_[i] *= (1 + 0.05 * normDist_(gen_));
             }
@@ -217,7 +227,6 @@ namespace raisim {
 
         void observe(Eigen::Ref<EigenVec> ob) final {
             /// convert it to float
-            obDouble_ -= targetPoint_;
             ob = obDouble_.cast<float>();
         }
 
@@ -234,7 +243,7 @@ namespace raisim {
             }
 
             for (int i = 0; i < 3; i++) {
-                if (bodyPos_.norm() > 15) {
+                if (bodyPos_[i] > 20) {
                     loopCount_++;
                     updateTarget = false;
                     return true;
@@ -287,7 +296,7 @@ namespace raisim {
             if (updateTarget){
                 for(int i =0; i<3; i++) targetPoint_(i) = normDist_(gen_);
                 targetPoint_.head(3) /= targetPoint_.head(3).norm();
-                targetPoint_.head(3) *= 10; // target point has distance of 10 m within a sphere
+                targetPoint_.head(3) *= radius; // target point has distance of 10 m within a sphere
                 if (visualizable_) visPoint->setPosition(targetPoint_.head(3));
                 updateTarget = false;
             }
@@ -390,7 +399,7 @@ namespace raisim {
         raisim::Reward rewards_;
         std::set<size_t> bodyIndices_;
         std::set<size_t> baseIndex_;
-        double terminalRewardCoeff_ = -15.;
+        double terminalRewardCoeff_ = -10.;
         double relativeAbsPosition;
         double relPositionReward;
 

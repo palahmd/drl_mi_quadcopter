@@ -49,7 +49,7 @@ helper = helper(env=env, num_obs=ob_dim,
 # Training
 n_steps = math.floor(cfg['environment']['max_time'] / cfg['environment']['control_dt'])
 total_steps = n_steps * env.num_envs
-pid = PID(1.5, 40, 4, ob_dim, act_dim, cfg['environment']['control_dt'], 1.727)
+pid = PID(1.5, 250, 4.1, ob_dim, act_dim, cfg['environment']['control_dt'], 1.727)
 #pid = PID(2.5, 200, 8, ob_dim, act_dim, cfg['environment']['control_dt'], 1.727)
 
 for update in range(1000000):
@@ -66,10 +66,12 @@ for update in range(1000000):
     average_dones = 0.
 
     done_vec = np.zeros(shape=(int(n_steps * 1.5), cfg["environment"]["num_envs"], 1), dtype="bool")
-
+    all_times = 0
+    finished = np.zeros(env.num_envs, dtype=bool)
+    count = 0
     for step in range(int(n_steps)):
         frame_start = time.time()
-        obs += targets
+        #obs += targets
 
         for i in range(0, env.num_envs):
             expert_obs_env_i = obs[i, :]
@@ -82,7 +84,14 @@ for update in range(1000000):
         done_vec[step] = dones.reshape(env.num_envs, 1).copy()
 
         obs = env.observe()
-        
+
+        for i in range(env.num_envs):
+            if np.sqrt(np.power(obs[i][0],2) + np.power(obs[i][1],2) + np.power(obs[i][2],2)) < 0.1:
+                if finished[i] == False and step > 200:
+                    all_times += step
+                    finished[i] = True
+                    count += 1
+
         # frequency of outter PID acceleration controller
         if loopCount == 8:
             loopCount = 7
@@ -103,6 +112,8 @@ for update in range(1000000):
     print('{:<40} {:>6}'.format("failed environments: ", '{:0.6f}'.format(num_failed_envs)))
     print('{:<40} {:>6}'.format("total reward: ", '{:0.6f}'.format(reward_sum)))
     print('----------------------------------------------------\n')
+
+    print(all_times*cfg['environment']['control_dt'] / count)
 
     start_step_id = step + 1
     reward_ll_sum = 0.0

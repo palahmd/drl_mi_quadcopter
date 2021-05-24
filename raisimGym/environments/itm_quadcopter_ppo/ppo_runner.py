@@ -138,7 +138,7 @@ else:
         helper.obs_rms.var[i] = obs_var
     print(helper.obs_rms.var.shape)
 
-#actor.distribution.enforce_maximum_std((torch.ones(4)*0.2).to(device))
+actor.distribution.enforce_minimum_std((torch.ones(4)*0.4).to(device))
 
 """ 
 Training Loop
@@ -250,8 +250,9 @@ for update in range(10000):
 
     mean_loss = ppo.update(actor_obs=obs,
                value_obs=obs,
-               log_this_iteration=update % 10 == 0,
-               update=update)
+               log_this_iteration=update % 5 == 0,
+               update=update,
+                reward_sum=reward_sum/env.num_envs)
 
     end = time.time()
 
@@ -265,7 +266,7 @@ for update in range(10000):
     print('{:>6}th iteration'.format(update))
     print('{:<40} {:>6}'.format("average ll reward: ", '{:0.10f}'.format(average_ll_performance)))
     print('{:<40} {:>6}'.format("total reward: ", '{:0.10f}'.format(reward_sum)))
-    print('{:<40} {:>6}'.format("dones: ", '{:0.6f}'.format(average_dones)))
+    print('{:<40} {:>6}'.format("dones: ", '{:0.6f}'.format(done_sum)))
     print('{:<40} {:>6}'.format("mean loss: ", '{:0.6f}'.format(mean_loss)))
     print('{:<40} {:>6}'.format("time elapsed in this iteration: ", '{:6.4f}'.format(end - start)))
     print('{:<40} {:>6}'.format("fps: ", '{:6.0f}'.format(total_steps / (end - start))))

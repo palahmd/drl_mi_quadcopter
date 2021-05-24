@@ -8,13 +8,13 @@ environment:
   render: True
 
   num_envs: 240
-  vis_every_n: 50
+  vis_every_n: 20
   visualize_eval: True
   num_threads: 40
 
   reward:
     position:
-      coeff: -0.003
+      coeff: -0.001
     relPosition:
       coeff: 0.0
     thrust:
@@ -22,7 +22,7 @@ environment:
     orientation:
       coeff: -0.002
     angularVelocity:
-      coeff: -0.0005 # maybe not a good choice
+      coeff: -0.0002 # maybe not a good choice
 
 
 architecture:
@@ -42,17 +42,17 @@ helper:
 
 
 hyperparam:
-  num_mini_batches: 8
-  num_learning_epochs: 12
+  num_mini_batches: 6
+  num_learning_epochs: 8
   shuffle: False # True should give better sample efficiency
   gamma: 0.998
   lam: 0.95
-  init_beta: 0.3
+  init_beta: 0.5
   beta_min: 0.3
-  beta_scheduler: 0.0
+  beta_scheduler: 0.001
   use_lr_scheduler: False
   max_lr: 0.002
-  min_lr: 0.00005 # is the actual learning rate if use_lr_scheduler = False
+  min_lr: 0.001 # is the actual learning rate if use_lr_scheduler = False
   l2_reg_weight: 0.0001
-  entropy_weight: 0.0005
+  entropy_weight: 0.0001
 

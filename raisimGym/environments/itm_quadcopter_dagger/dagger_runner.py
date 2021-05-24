@@ -308,9 +308,10 @@ for update in range(2000):
         obs[i] = learner_obs[i][0:18]
     obs = helper.normalize_observation(obs)
     mean_loss, mean_action_loss, mean_action_log_prob_loss, mean_value_loss = learner.update(obs=obs,
-                                                                                             log_this_iteration=update % 10 == 0,
-                                                                                             update=update)
-    actor.distribution.enforce_minimum_std((torch.ones(4)*0.2).to(device))
+                                                                                             log_this_iteration=update % 1 == 0,
+                                                                                             update=update,
+                                                                                             mean_reward=reward_sum/env.num_envs)
+    #actor.distribution.enforce_minimum_std((torch.ones(4)*0.2).to(device))
     tot_dones = learner.tot_dones
     failed_envs = learner.failed_envs
 

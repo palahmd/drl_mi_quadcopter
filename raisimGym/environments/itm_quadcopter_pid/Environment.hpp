@@ -149,7 +149,7 @@ namespace raisim {
             rewards_.record("position", relativeAbsPosition);
             rewards_.record("relPosition", relPositionReward);
             rewards_.record("thrust", normedControlThrusts_.norm());
-            rewards_.record("orientation", std::acos(bodyRot_(2,1)));
+            rewards_.record("orientation", std::acos(worldRot_[8]));
             rewards_.record("angularVelocity", bodyAngVel_.norm());
 
             return rewards_.sum();
@@ -189,14 +189,14 @@ namespace raisim {
             for (size_t i = 0; i < 4; i++) {
                 obDouble_[i + 18] = quat_[i];
             }
+            obDouble_ -= targetPoint_;
             for (size_t i = 0; i < obDim_; i++){
-                obDouble_[i] *= (1 + generateNoise(0, 0.02));
+                obDouble_[i] *= (1 + generateNoise(0, 0.05));
             }
         }
 
         void observe(Eigen::Ref<EigenVec> ob) final {
             /// convert it to float
-            obDouble_ -= targetPoint_;
             ob = obDouble_.cast<float>();
         }
 
@@ -256,7 +256,7 @@ namespace raisim {
             if (updateTarget){
                 for(int i =0; i<3; i++) targetPoint_(i) = generateRandomValue(-1, 1);
                 targetPoint_.head(3) /= targetPoint_.head(3).norm();
-                targetPoint_.head(3) *= 10; // target point has distance of 10 m within a sphere
+                targetPoint_.head(3) *= radius; // target point has distance of 10 m within a sphere
                 if (visualizable_) visPoint->setPosition(targetPoint_.head(3));
                 updateTarget = false;
             }

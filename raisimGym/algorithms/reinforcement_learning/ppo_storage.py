@@ -91,3 +91,9 @@ class RolloutStorage:
                 self.advantages.view(-1, 1)[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size], \
                 self.returns.view(-1, 1)[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size], \
                 self.actions_log_prob.view(-1, 1)[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size]
+
+    def find_failed_envs(self):
+        failed_envs = torch.where(self.dones == 1)
+        failed_envs_index = list(dict.fromkeys(failed_envs[1].tolist()))
+        num_failed_envs = len(failed_envs_index)
+        return num_failed_envs, self.dones.sum()

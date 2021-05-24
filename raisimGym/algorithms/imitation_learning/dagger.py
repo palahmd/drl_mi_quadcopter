@@ -118,7 +118,7 @@ class DAgger:
         values = self.critic.predict(torch.from_numpy(self.actor_obs).to(self.device))
         self.storage.add_transitions(self.actor_obs, self.expert_actions, rews, dones, values)
 
-    def update(self, obs, log_this_iteration, update):
+    def update(self, obs, log_this_iteration, update, mean_reward):
         last_values = self.critic.predict(torch.from_numpy(obs).to(self.device))
 
         # calculate logging variables
@@ -128,6 +128,8 @@ class DAgger:
         mean_returns, mean_value_loss, mean_values, \
         prevented_dones, infos \
             = self._train_step_with_behavioral_cloning()
+
+        mean_rewards = mean_reward
 
         # calculate beta for the next iteration
         self.adjust_beta()
@@ -156,6 +158,7 @@ class DAgger:
         self.writer.add_scalar('Critic/mean_value_loss', variables['mean_value_loss'], variables['it'])
         self.writer.add_scalar('Critic/mean_values', variables['mean_values'], variables['it'])
         self.writer.add_scalar('Critic/mean_returns', variables['mean_returns'], variables['it'])
+        self.writer.add_scalar('Critic/mean_total_rewards', variables['mean_rewards'], variables['it'])
         
 
     def choose_action_per_env(self, env_helper):

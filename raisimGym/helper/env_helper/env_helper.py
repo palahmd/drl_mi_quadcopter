@@ -45,13 +45,27 @@ class helper:
             if self.update_mean:
                 self.obs_rms.update(observation)
 
-            max_ob = observation[0:3].max()
-            if max_ob > self.clip_obs:
-                observation[0:3] /= (max_ob/self.clip_obs)
-                return observation
+            #max_ob = np.absolute(observation[0:3]).max()
+            #if max_ob > self.clip_obs:
+            #    observation[0:3] /= (2*max_ob/self.clip_obs)
 
-            observation_norm = np.clip((observation - self.obs_rms.mean) / np.sqrt(self.obs_rms.var + 1e-8), - self.clip_obs,
-                        self.clip_obs)
+            obs_rms_var = self.obs_rms.var.copy()
+            if True:
+                if len(observation) > 1:
+                    for i in range(len(obs_rms_var)):
+                        obs_rms_var[i][0:3] = self.obs_rms.var[i][0:3] * (0.2+(np.linalg.norm(observation[i][0:3])/10)*0.8)
+
+                    observation_norm = np.clip((observation - self.obs_rms.mean) / np.sqrt(obs_rms_var + 1e-8), - self.clip_obs,
+                                               self.clip_obs)
+                else:
+                    obs_rms_var[0:3] = self.obs_rms.var[0:3] * (0.2+(np.linalg.norm(observation[0:3])/10)*0.8)
+                    observation_norm = np.clip((observation - self.obs_rms.mean[0]) / np.sqrt(obs_rms_var[0] + 1e-8), - self.clip_obs,
+                                               self.clip_obs)
+            else:
+                observation_norm = np.clip((observation - self.obs_rms.mean) / np.sqrt(obs_rms_var + 1e-8), - self.clip_obs,
+                                       self.clip_obs)
+
+            #observation_norm = (observation - self.obs_rms.mean) / np.sqrt(self.obs_rms.var + 1e-8)
 
             return observation_norm
 

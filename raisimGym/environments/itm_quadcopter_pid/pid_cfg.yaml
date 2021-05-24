@@ -4,25 +4,25 @@ record_video: yes
 environment:
   simulation_dt: 0.002
   control_dt: 0.01
-  max_time: 13.0
+  max_time: 6.0
   render: True
 
-  num_envs: 192
+  num_envs: 24
   eval_every_n: 20
   visualize_eval: True
   num_threads: 40
 
   reward:
     position:
-      coeff: -0.004
+      coeff: -0.003
     relPosition:
       coeff:
     thrust:
       coeff: 0.0
     orientation:
-      coeff: 0.0
+      coeff: -0.00
     angularVelocity:
-      coeff: 0.0
+      coeff: -0.000
 
 
 architecture:

@@ -68,6 +68,8 @@ class PPO:
         self.actions_log_prob = None
         self.actor_obs = None
         self.expert_actions = None
+        self.failed_envs = None
+        self.dones = None
         self.actions_log_prob = torch.zeros((self.num_envs, 1)).to(self.device)
 
     def observe(self, expert_actions, actor_obs):
@@ -84,13 +86,14 @@ class PPO:
         self.storage.add_transitions(self.actor_obs, value_obs, self.actions, self.expert_actions, rews, dones, values,
                                      self.actions_log_prob)
 
-    def update(self, actor_obs, value_obs, log_this_iteration, update):
+    def update(self, actor_obs, value_obs, log_this_iteration, update, reward_sum):
         last_values = self.critic.predict(torch.from_numpy(value_obs).to(self.device))
 
         # Learning step
         self.storage.compute_returns(last_values.to(self.device), self.gamma, self.lam)
         mean_loss, mean_value_loss, mean_surrogate_loss, mean_action_log_prob_loss, mean_entropy_loss, mean_returns, \
-        mean_advantages, infos = self._train_step()
+        mean_advantages, mean_bc_loss, infos = self._train_step()
+        mean_cumul_reward = reward_sum
         self.storage.clear()
 
         if log_this_iteration:
@@ -107,11 +110,16 @@ class PPO:
         self.writer.add_scalar('Loss/surrogate', variables['mean_surrogate_loss'], variables['it'])
         self.writer.add_scalar('Loss/mean_action_log_prob_loss', variables['mean_action_log_prob_loss'], variables['it'])
         self.writer.add_scalar('Loss/mean_entropy_loss', variables['mean_entropy_loss'], variables['it'])
-        self.writer.add_scalar('mean_returns', variables['mean_returns'], variables['it'])
-        self.writer.add_scalar('mean_advantages', variables['mean_advantages'], variables['it'])
-        self.writer.add_scalar('Policy/mean_noise_std', mean_std.item(), variables['it'])
+        self.writer.add_scalar('Loss/mean_bc_loss', variables['mean_bc_loss'], variables['it'])
+        self.writer.add_scalar('Other/mean_returns', variables['mean_returns'], variables['it'])
+        self.writer.add_scalar('Other/mean_cumul_returns', variables['mean_cumul_reward'], variables['it'])
+        self.writer.add_scalar('Other/failed_envs', self.failed_envs, variables['it'])
+        self.writer.add_scalar('Other/dones', self.dones, variables['it'])
+        self.writer.add_scalar('Other/mean_advantages', variables['mean_advantages'], variables['it'])
+        self.writer.add_scalar('Other/mean_noise_std', mean_std.item(), variables['it'])
 
     def _train_step(self):
+        self.failed_envs, self.dones = self.storage.find_failed_envs()
         mean_loss = 0
         mean_value_loss = 0
         mean_surrogate_loss = 0
@@ -119,6 +127,7 @@ class PPO:
         mean_action_log_prob_loss = 0
         mean_returns = 0
         mean_advantages = 0
+        mean_bc_loss = 0
         for epoch in range(self.num_learning_epochs):
             for actor_obs_batch, critic_obs_batch, actions_batch, expert_actions_batch, target_values_batch, advantages_batch, returns_batch, old_actions_log_prob_batch \
                     in self.batch_sampler(self.num_mini_batches):
@@ -129,7 +138,7 @@ class PPO:
 
                 l2_reg = [torch.sum(torch.square(w)) for w in self.actor.parameters() and self.critic.parameters()]
                 l2_reg_norm = sum(l2_reg) / 2
-                l2_reg_loss = 0.0001 * l2_reg_norm
+                l2_reg_loss = 0.0005 * l2_reg_norm
 
                 ratio = torch.exp(actions_log_prob_batch - torch.squeeze(old_actions_log_prob_batch))
 
@@ -151,7 +160,7 @@ class PPO:
                 bc_loss = -expert_log.mean()
 
                 loss = surrogate_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy_batch.mean() \
-                       + 0.0 * bc_loss + l2_reg_loss
+                       + 0.001 * bc_loss + l2_reg_loss
 
                 # Gradient step
                 self.optimizer.zero_grad()
@@ -166,6 +175,7 @@ class PPO:
                 mean_action_log_prob_loss += -actions_log_prob_batch.mean().item()
                 mean_returns += returns_batch.mean().item()
                 mean_advantages += advantages_batch.mean().item()
+                mean_bc_loss += bc_loss.item()
 
 
         num_updates = self.num_learning_epochs * self.num_mini_batches
@@ -176,6 +186,7 @@ class PPO:
         mean_action_log_prob_loss /= num_updates
         mean_returns /= num_updates
         mean_advantages /= num_updates
+        mean_bc_loss /= num_updates
 
         return mean_loss, mean_value_loss, mean_surrogate_loss, mean_action_log_prob_loss, mean_entropy_loss, \
-               mean_returns, mean_advantages, locals()
+               mean_returns, mean_advantages, mean_bc_loss, locals()
