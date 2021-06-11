@@ -48,4 +48,6 @@ raisimUnity.x86_64
 *.yml
 *.yaml
 
+.DS_Store
+.vscode
 
