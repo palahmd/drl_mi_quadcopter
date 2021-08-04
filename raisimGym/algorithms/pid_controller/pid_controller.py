@@ -24,10 +24,7 @@ class PID:
                       [0.016, -0.016, 0.016, -0.016]]))
 
     def control(self, obs, target, loopCount):
-
-        #eulerAngles = np.array(R.from_matrix(obs[3:12].reshape(3, 3)).as_rotvec()).reshape(3, 1) # does not work
         eulerAngles = self.quatToEuler(obs[18:22])
-        #eulerAngles = obs[18:21]
         currState = np.concatenate([obs[0:3], eulerAngles, obs[12:18]])
         desState = np.zeros(shape=(12, 1))
         errState = target - currState
@@ -61,13 +58,13 @@ class PID:
             if self.controlThrusts[i] < 0.5 * self.hoverThrust:
                 self.controlThrusts[i] = 0.5 * self.hoverThrust
 
+        # normalize action to [-1,1]
         if self.normalize_action:
             self.controlThrusts = self.controlThrusts / (0.5*self.hoverThrust) - 2
 
         return self.controlThrusts.reshape(1, self.act_dim).astype(dtype="float32")
 
     def quatToEuler(self, q):
-
         angles = np.zeros(shape=(3, 1))
 
         sinr_cosp = 2 * (q[0] * q[1] + q[2] * q[3])

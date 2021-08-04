@@ -4,10 +4,10 @@ record_video: yes
 environment:
   simulation_dt: 0.0025
   control_dt: 0.01
-  max_time: 46.0
+  max_time: 4.0
   render: True
 
-  num_envs: 1
+  num_envs: 240
   vis_every_n: 20
   visualize_eval: True
   num_threads: 40
@@ -20,9 +20,9 @@ environment:
     thrust:
       coeff: 0.0 # maybe not a good choice
     orientation:
-      coeff: -0.00
+      coeff: -0.002
     angularVelocity:
-      coeff: -0.000 # maybe not a good choice
+      coeff: -0.0005 # maybe not a good choice
 
 
 architecture:

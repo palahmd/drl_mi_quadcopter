@@ -1,0 +1,13 @@
+#
+# A fatal error has been detected by the Java Runtime Environment:
+#
+#  SIGSEGV (0xb) at pc=0x00007f770b2759f6, pid=34161, tid=34217
+#
+# JRE version: OpenJDK Runtime Environment Zulu15.28+51-CA (15.0.1+9) (build 15.0.1+9)
+# Java VM: OpenJDK 64-Bit Server VM Zulu15.28+51-CA (15.0.1+9, mixed mode, tiered, compressed oops, g1 gc, linux-amd64)
+# Problematic frame:
+# C  [libc.so.6+0x499f6]
+#
+# Core dump will be written. Default location: Core dumps may be processed with "/usr/share/apport/apport %p %s %c %d %P %E" (or dumping to /home/pala/drl_mi_quadcopter/raisimGym/environments/itm_quadcopter_testenv/core.34161)
+#
+# If you would like to submit a bug report, please visit:

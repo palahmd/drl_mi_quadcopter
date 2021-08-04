@@ -145,7 +145,7 @@ Training Loop
 """
 
 
-for update in range(10000):
+for update in range(3000):
     env.reset()
     start = time.time()
     reward_sum = 0
@@ -154,7 +154,7 @@ for update in range(10000):
 
     # optional: skip first visualization with update = 1
     if update == 0:
-        update -= 1
+        update -= 0
         skip_eval = True
     update += last_update
 
@@ -250,7 +250,7 @@ for update in range(10000):
 
     mean_loss = ppo.update(actor_obs=obs,
                value_obs=obs,
-               log_this_iteration=update % 5 == 0,
+               log_this_iteration=update % 10 == 0,
                update=update,
                 reward_sum=reward_sum/env.num_envs)
 

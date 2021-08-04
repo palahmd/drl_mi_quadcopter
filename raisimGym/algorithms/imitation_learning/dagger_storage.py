@@ -6,23 +6,25 @@ class RolloutStorage:
     def __init__(self, num_envs, num_transitions_per_env, actor_obs_shape, critic_obs_shape, actions_shape, device):
         self.device = device
 
-        # Core
+        # core
         self.actor_obs = torch.zeros(num_transitions_per_env, num_envs, *actor_obs_shape).to(self.device)
         self.rewards = torch.zeros(num_transitions_per_env, num_envs, 1).to(self.device)
         self.dones = torch.zeros(num_transitions_per_env, num_envs, 1).byte().to(self.device)
 
-        # For DAgger and BC
+        # for DAgger and BC
         self.values = torch.zeros(num_transitions_per_env, num_envs, 1).to(self.device)
         self.returns = torch.zeros(num_transitions_per_env, num_envs, 1).to(self.device)
         self.advantages = torch.zeros(num_transitions_per_env, num_envs, 1).to(self.device)
         self.expert_actions = torch.zeros(num_transitions_per_env, num_envs, *actions_shape).to(self.device)
 
+        # env. related
         self.num_transitions_per_env = num_transitions_per_env
         self.num_envs = num_envs
         self.device = device
         self.num_acts = actions_shape[0]
         self.num_obs = critic_obs_shape[0]
 
+        # for the self.reset_failed_env() method
         self.step = 0
         self.init_state = torch.zeros(critic_obs_shape[0]).to(self.device)
         self.init_state[2] = 0.135
@@ -45,6 +47,8 @@ class RolloutStorage:
         self.step = 0
 
     def compute_returns(self, last_values, gamma, lam):
+        # returns and advantages are computed based on the Generalized Advantage Estimation method
+        # https://arxiv.org/abs/1506.02438
         advantage = 0
         for step in reversed(range(self.num_transitions_per_env)):
             if step == self.num_transitions_per_env - 1:
@@ -87,6 +91,7 @@ class RolloutStorage:
 
 
     def reset_failed_episodes(self):
+        # reset failed environments (= quadcopter collided with the ground) with initial/final states and no transitions
         failed_envs = torch.where(self.dones == 1)
         index = failed_envs[1].tolist()
 
@@ -98,6 +103,7 @@ class RolloutStorage:
 
 
     def filter_failed_envs(self, filter_envs = True):
+        # filter out failed environments and replace them randomly with transitions of other environments
         failed_envs = torch.where(self.dones == 1)
         failed_envs_index = list(dict.fromkeys(failed_envs[1].tolist()))
         num_failed_envs = len(failed_envs_index)

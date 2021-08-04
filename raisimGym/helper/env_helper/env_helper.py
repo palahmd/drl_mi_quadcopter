@@ -7,7 +7,8 @@ from raisimGymTorch.env.RaisimGymVecEnv import RunningMeanStd
 
 class helper:
 
-    def __init__(self, env, num_obs, normalize_ob=True, update_mean=True, scale_action=True, clip_action=False):
+    def __init__(self, env, num_obs, normalize_ob=True, update_mean=True, scale_action=True, clip_action=False,
+                 scale_obs_rms=False):
         self.num_envs = env.num_envs
         self.num_obs = num_obs
         self.obs_rms = RunningMeanStd(shape=[self.num_envs, self.num_obs])
@@ -16,7 +17,7 @@ class helper:
         self.update_mean = update_mean
         self.scale_action = scale_action
         self.clip_action = clip_action
-
+        self.scale_obs_rms = scale_obs_rms
 
     # action scaling
     def limit_action(self, actions):
@@ -37,20 +38,22 @@ class helper:
         else:
             return actions.cpu().detach().numpy()
 
-
-    # works as an environment wrapper, uses methods of env to normalize the observation and update the RMS.
-    # when to use: if a target point is defined in the runner file and needs to be calculated into the observation
+    """ works as an environment wrapper, uses methods of env to normalize the observation and update the RMS.
+        when to use: If the observation vector of env.observe has more entries than the actual neural network input. 
+        The respective method of the env object normalizes also the additional entries of the observation vector 
+        passed from the environment (defined in Environment.hpp)"""
     def normalize_observation(self, observation):
         if self.normalize_ob == True:
             if self.update_mean:
+                # update observation scaling based on the parallel algorithm
                 self.obs_rms.update(observation)
 
-            #max_ob = np.absolute(observation[0:3]).max()
-            #if max_ob > self.clip_obs:
-            #    observation[0:3] /= (2*max_ob/self.clip_obs)
-
+            """ if scale_obs_rms = True:
+                observation RMS will be scaled which has the effect of projecting the target point further away or closer
+                to the agent with a scaling factor of (0.2 + norm(pos)/10), since the agent is trained on target
+                points which are 10 m away."""
             obs_rms_var = self.obs_rms.var.copy()
-            if True:
+            if self.scale_obs_rms:
                 if len(observation) > 1:
                     for i in range(len(obs_rms_var)):
                         obs_rms_var[i][0:3] = self.obs_rms.var[i][0:3] * (0.2+(np.linalg.norm(observation[i][0:3])/10)*0.8)
@@ -65,13 +68,12 @@ class helper:
                 observation_norm = np.clip((observation - self.obs_rms.mean) / np.sqrt(obs_rms_var + 1e-8), - self.clip_obs,
                                        self.clip_obs)
 
-            #observation_norm = (observation - self.obs_rms.mean) / np.sqrt(self.obs_rms.var + 1e-8)
-
             return observation_norm
 
         else:
             return observation
 
+    # save and load observation scaling
     def save_scaling(self, dir_name, iteration):
         mean_file_name = dir_name + "/mean" + iteration + ".csv"
         var_file_name = dir_name + "/var" + iteration + ".csv"
@@ -86,9 +88,8 @@ class helper:
         self.obs_rms.mean = np.loadtxt(mean_file_name, dtype=np.float32)
         self.obs_rms.var = np.loadtxt(var_file_name, dtype=np.float32)
 
-
+    # load the neural network model parameters
     def load_param(self, weight_path, actor, critic, learner, data_dir, file_name, save_items=True):
-
         if weight_path == "":
             raise Exception("\nCan't find the pre-trained weight, please provide a pre-trained weight with --weight switch\n")
         print("\nRetraining from the checkpoint:", weight_path+"\n")
@@ -116,8 +117,9 @@ class helper:
         #learner.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         #learner.scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
 
+        """ Only useful in combination with DAgger: A method to prevent learning from failed environments and restoring 
+        from the last checkpoint"""
     def restart_from_last_checkpoint(self, env, saver, actor, critic, learner, update_num):
-        """ ONLY USEFUL FOR DAGGER_RUNNER"""
         # Reset update number
         update_modulo = update_num % 10
 

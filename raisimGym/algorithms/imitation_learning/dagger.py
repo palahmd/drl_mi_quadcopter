@@ -32,50 +32,52 @@ class DAgger:
                  device='cpu',
                  shuffle_batch=True):
 
-        # Environment parameters
+        # environment parameters
         self.act_dim = act_dim
         self.num_envs = num_envs
         self.num_transitions_per_env = num_transitions_per_env
 
         # DAgger components
-        self.storage = RolloutStorage(num_envs, num_transitions_per_env, actor.obs_shape, critic.obs_shape,
-                                      actor.action_shape, device)
         self.actor = actor
         self.critic = critic
         self.device = device
         self.deterministic_policy = deterministic_policy
 
+        # data storage, containing observations, actions, rewards etc.
+        self.storage = RolloutStorage(num_envs, num_transitions_per_env, actor.obs_shape, critic.obs_shape,
+                                      actor.action_shape, device)
         if shuffle_batch:
             self.batch_sampler = self.storage.mini_batch_generator_shuffle
         else:
             self.batch_sampler = self.storage.mini_batch_generator_inorder
 
-        # Training parameters
+        # training parameters
         self.num_mini_batches = num_mini_batches
         self.num_learning_epochs = num_learning_epochs
         self.use_lr_scheduler = use_lr_scheduler
 
+        # optimizer and learning rate scheduler
         if self.deterministic_policy:
             self.optimizer = optim.Adam([*self.actor.parameters(),
                                          *self.critic.parameters()], lr=min_lr)
         else:
             self.optimizer = optim.Adam([*self.actor.parameters(), *self.critic.parameters()], lr=min_lr)
 
-
-
         if self.use_lr_scheduler == True:
             self.min_lr = min_lr
             self.max_lr = max_lr
+            # cyclic LR scheduler, linearly increasing and decreasing within defined boundaries according to
+            # https://arxiv.org/abs/1506.01186
             self.scheduler = optim.lr_scheduler.CyclicLR(self.optimizer, base_lr=self.min_lr, cycle_momentum=False,
                                                          max_lr=self.max_lr, step_size_up=2*self.num_mini_batches,
                                                          last_epoch=-1, verbose=False)
-
             if last_update != 0:
                 self.scheduler.step(epoch=last_update*self.num_learning_epochs*self.num_mini_batches)
         else:
-            self.scheduler = optim.lr_scheduler.StepLR(self.optimizer, step_size=10, gamma=0.9)
+            # dummy scheduler
+            self.scheduler = optim.lr_scheduler.StepLR(self.optimizer, step_size=100, gamma=1.0)
 
-
+        # DAgger parameters
         self.beta_goal = beta
         self.beta = 1
         self.beta_scheduler = beta_scheduler
@@ -84,7 +86,7 @@ class DAgger:
         self.gamma = gamma
         self.lam = lam
 
-        # Log
+        # Tensorboard logger
         self.log_dir = os.path.join(log_dir, datetime.now().strftime('%b%d_%H-%M-%S'))
         self.writer = SummaryWriter(log_dir=self.log_dir, flush_secs=10)
         self.tot_timesteps = 0
@@ -102,28 +104,32 @@ class DAgger:
 
     def observe(self, actor_obs, expert_actions, env_helper):
         self.actor_obs = actor_obs
-
-        # set expert action and calculate leraner action
         self.expert_actions = torch.from_numpy(expert_actions).to(self.device)
+
+        # determine learner action. self.actor.sample samples an action according to the current distribution based on
+        # the determined action. Noiseless action is the direct output of the neural network.
         self.learner_actions = self.actor.noiseless_action(torch.from_numpy(actor_obs).to(self.device))
         #self.learner_actions, _ = self.actor.sample(torch.from_numpy(actor_obs).to(self.device))
 
-        # take expert action with beta prob. and policy action with (1-beta) prob.
+        # take expert action with beta probability, otherwise learner action with (1-beta) probability for each env.
         self.actions = expert_actions
         self.choose_action_per_env(env_helper)
 
         return self.actions
 
     def step(self, rews, dones):
+        # add gathered data to the storage
         values = self.critic.predict(torch.from_numpy(self.actor_obs).to(self.device))
         self.storage.add_transitions(self.actor_obs, self.expert_actions, rews, dones, values)
 
     def update(self, obs, log_this_iteration, update, mean_reward):
+        # predict terminal state reward
         last_values = self.critic.predict(torch.from_numpy(obs).to(self.device))
 
-        # calculate logging variables
+        # compute returns, advantages, etc.
         self.storage.compute_returns(last_values.to(self.device), self.gamma, self.lam)
 
+        # perform an one-step behavioral cloning on the aggregated data
         mean_loss, mean_action_loss, mean_action_log_prob_loss, mean_l2_reg_loss, mean_entropy_loss, \
         mean_returns, mean_value_loss, mean_values, \
         prevented_dones, infos \
@@ -131,13 +137,14 @@ class DAgger:
 
         mean_rewards = mean_reward
 
-        # calculate beta for the next iteration
+        # adjust beta prob. for the next episode
         self.adjust_beta()
 
+        # log to tensorboard
         if log_this_iteration:
             self.log({**locals(), **infos, 'it': update})
 
-        # clear storage for the next iteration
+        # clear storage for the next episode
         self.storage.clear()
 
         return mean_loss, mean_action_loss, mean_action_log_prob_loss, mean_value_loss
@@ -175,6 +182,7 @@ class DAgger:
 
 
     def adjust_beta(self):
+        # either lock beta at maximum/minimum value or adjust beta cyclical
         if self.beta <= self.beta_goal:
             #self.beta_scheduler = -abs(self.beta_scheduler)
             self.beta_scheduelr = 0
@@ -185,9 +193,12 @@ class DAgger:
             
         self.beta -= self.beta_scheduler
 
-    """ Main training: rolling out storage and training the learner with one-step behavioral cloning """
+
+    """ Main training: rolling out storage and training the learner with a one-step behavioral cloning """
 
     def _train_step_with_behavioral_cloning(self):
+        # this method prevents learning suboptimal state-action relations from the expert by replacing the transitions
+        # of a failed environment (= quadcopter collided with the ground) with another randomly chosen environment
         prevented_dones = self.storage.dones.sum()
         self.failed_envs = self.storage.filter_failed_envs(False)
 
@@ -201,11 +212,14 @@ class DAgger:
         mean_value_loss = 0
         mean_values = 0
         self.tot_dones = 0
+
+        # actual training loop
         for epoch in range(self.num_learning_epochs):
             for actor_obs_batch, expert_actions_batch, target_values_batch, \
                 returns_batch, dones_batch \
                     in self.batch_sampler(self.num_mini_batches):
 
+                # define loss functions
                 act_log_prob_batch, entropy_batch = self.actor.evaluate(actor_obs_batch, expert_actions_batch)
                 new_actions_batch = self.actor.noiseless_action(actor_obs_batch).to(self.device)
 
@@ -221,16 +235,18 @@ class DAgger:
                 entropy_loss = self.entropy_weight * -entropy_batch.mean()
                 l2_reg_loss = self.l2_reg_weight * l2_reg_norm
 
-                if not self.deterministic_policy:
-                    loss = action_log_prob_loss + entropy_loss + l2_reg_loss + 0.5 * value_loss
-                else:
+                if self.deterministic_policy:
                     loss = action_loss + entropy_loss + l2_reg_loss
+                else:
+                    loss = action_log_prob_loss + entropy_loss + l2_reg_loss + 0.5 * value_loss
 
-
+                # optimization step based on loss function
                 self.optimizer.zero_grad()
                 loss.backward()
                 self.optimizer.step()
-                #self.scheduler.step()
+
+                if self.use_lr_scheduler:
+                    self.scheduler.step()
 
                 mean_loss += loss.item()
                 mean_action_loss += action_loss.item()
