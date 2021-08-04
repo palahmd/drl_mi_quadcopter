@@ -2,12 +2,12 @@ seed: 1
 record_video: yes
 
 environment:
-  simulation_dt: 0.002
+  simulation_dt: 0.0025
   control_dt: 0.01
-  max_time: 6.0
+  max_time: 15.0
   render: True
 
-  num_envs: 24
+  num_envs: 240
   eval_every_n: 20
   visualize_eval: True
   num_threads: 40
@@ -20,9 +20,9 @@ environment:
     thrust:
       coeff: 0.0
     orientation:
-      coeff: -0.00
+      coeff: -0.002
     angularVelocity:
-      coeff: -0.000
+      coeff: -0.0005
 
 
 architecture:

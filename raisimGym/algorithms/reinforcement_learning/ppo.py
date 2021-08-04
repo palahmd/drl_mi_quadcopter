@@ -1,3 +1,8 @@
+"""
+This file is mostly based on the respective file of the original raisimGymTorch repository with minor/major
+modifications.
+"""
+
 from datetime import datetime
 import os
 import torch
@@ -22,15 +27,23 @@ class PPO:
                  entropy_coef=0.0,
                  learning_rate=5e-4,
                  max_grad_norm=0.5,
+                 l2_reg_coef=0.0001,
+                 bc_coef=0.005,
                  use_clipped_value_loss=True,
                  log_dir='run',
                  device='cpu',
                  shuffle_batch=True,
                  deterministic_policy=False):
 
+        # env parameters
+        self.num_transitions_per_env = num_transitions_per_env
+        self.num_envs = num_envs
+
         # PPO components
         self.actor = actor
         self.critic = critic
+
+        # data storage, containing observations, actions, rewards etc.
         self.storage = RolloutStorage(num_envs, num_transitions_per_env, actor.obs_shape, critic.obs_shape, actor.action_shape, device)
 
         if shuffle_batch:
@@ -40,10 +53,6 @@ class PPO:
 
         self.optimizer = optim.Adam([*self.actor.parameters(), *self.critic.parameters()], lr=learning_rate)
         self.device = device
-
-        # env parameters
-        self.num_transitions_per_env = num_transitions_per_env
-        self.num_envs = num_envs
 
         # PPO parameters
         self.clip_param = clip_param
@@ -56,8 +65,10 @@ class PPO:
         self.max_grad_norm = max_grad_norm
         self.use_clipped_value_loss = use_clipped_value_loss
         self.deterministic_policy = deterministic_policy
+        self.l2_reg_coef = l2_reg_coef
+        self.bc_coef = bc_coef
 
-        # Log
+        # Tensorboard logger
         self.log_dir = os.path.join(log_dir, datetime.now().strftime('%b%d_%H-%M-%S'))
         self.writer = SummaryWriter(log_dir=self.log_dir, flush_secs=10)
         self.tot_timesteps = 0
@@ -73,24 +84,32 @@ class PPO:
         self.actions_log_prob = torch.zeros((self.num_envs, 1)).to(self.device)
 
     def observe(self, expert_actions, actor_obs):
-        self.expert_actions = torch.from_numpy(expert_actions).to(self.device)
         self.actor_obs = actor_obs
+        self.expert_actions = torch.from_numpy(expert_actions).to(self.device)
+
+        # determine learner action. self.actor.sample samples an action according to the current distribution based on
+        # the determined action. Noiseless action is the direct output of the neural network.
         self.actions, self.actions_log_prob = self.actor.sample(torch.from_numpy(actor_obs).to(self.device))
         if self.deterministic_policy:
             self.actions = self.actor.noiseless_action(torch.from_numpy(actor_obs).to(self.device))
         # self.actions = np.clip(self.actions.numpy(), self.env.action_space.low, self.env.action_space.high)
+
         return self.actions
 
     def step(self, value_obs, rews, dones):
+        # add gathered data to the storage
         values = self.critic.predict(torch.from_numpy(value_obs).to(self.device))
         self.storage.add_transitions(self.actor_obs, value_obs, self.actions, self.expert_actions, rews, dones, values,
                                      self.actions_log_prob)
 
     def update(self, actor_obs, value_obs, log_this_iteration, update, reward_sum):
+        # predict terminal state reward
         last_values = self.critic.predict(torch.from_numpy(value_obs).to(self.device))
 
-        # Learning step
+        # compute returns, advantages, etc.
         self.storage.compute_returns(last_values.to(self.device), self.gamma, self.lam)
+
+        # learning step
         mean_loss, mean_value_loss, mean_surrogate_loss, mean_action_log_prob_loss, mean_entropy_loss, mean_returns, \
         mean_advantages, mean_bc_loss, infos = self._train_step()
         mean_cumul_reward = reward_sum
@@ -119,7 +138,10 @@ class PPO:
         self.writer.add_scalar('Other/mean_noise_std', mean_std.item(), variables['it'])
 
     def _train_step(self):
+        # this method determines the number of failed environments (= quadcopter collided with the ground)
         self.failed_envs, self.dones = self.storage.find_failed_envs()
+
+        # for logging
         mean_loss = 0
         mean_value_loss = 0
         mean_surrogate_loss = 0
@@ -128,17 +150,20 @@ class PPO:
         mean_returns = 0
         mean_advantages = 0
         mean_bc_loss = 0
+
+        # actual training loop
         for epoch in range(self.num_learning_epochs):
             for actor_obs_batch, critic_obs_batch, actions_batch, expert_actions_batch, target_values_batch, advantages_batch, returns_batch, old_actions_log_prob_batch \
                     in self.batch_sampler(self.num_mini_batches):
 
+                # define loss functions
                 actions_log_prob_batch, entropy_batch = self.actor.evaluate(actor_obs_batch, actions_batch)
                 value_batch = self.critic.evaluate(critic_obs_batch)
                 expert_log, _ = self.actor.evaluate(actor_obs_batch, expert_actions_batch)
 
                 l2_reg = [torch.sum(torch.square(w)) for w in self.actor.parameters() and self.critic.parameters()]
                 l2_reg_norm = sum(l2_reg) / 2
-                l2_reg_loss = 0.0005 * l2_reg_norm
+                l2_reg_loss = self.l2_reg_coef * l2_reg_norm
 
                 ratio = torch.exp(actions_log_prob_batch - torch.squeeze(old_actions_log_prob_batch))
 
@@ -147,7 +172,7 @@ class PPO:
                                                                                    1.0 + self.clip_param)
                 surrogate_loss = torch.max(surrogate, surrogate_clipped).mean()
 
-                # Value function loss
+                # value function loss
                 if self.use_clipped_value_loss:
                     value_clipped = target_values_batch + (value_batch - target_values_batch).clamp(-self.clip_param,
                                                                                                     self.clip_param)
@@ -160,9 +185,9 @@ class PPO:
                 bc_loss = -expert_log.mean()
 
                 loss = surrogate_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy_batch.mean() \
-                       + 0.001 * bc_loss + l2_reg_loss
+                       + l2_reg_loss + self.bc_coef * bc_loss
 
-                # Gradient step
+                # optimization step based on loss function
                 self.optimizer.zero_grad()
                 loss.backward()
                 nn.utils.clip_grad_norm_([*self.actor.parameters(), *self.critic.parameters()], self.max_grad_norm)

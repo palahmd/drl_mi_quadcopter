@@ -40,11 +40,11 @@ for i in range(len(init_state)):
     init_state[i][11] = 1
     init_state[i][18] = 1
 target_list = []
-target_list.append(np.array([10, 10, -2.5], dtype="float32"))
-target_list.append(np.array([0, 20, -5], dtype="float32"))
-target_list.append(np.array([-10, 10, -7.5], dtype="float32"))
-target_list.append(np.array([0, 0, -10], dtype="float32"))
-target_list.append(np.array([10, 10, -12.5], dtype="float32"))
+#target_list.append(np.array([10, 10, -2.5], dtype="float32"))
+#target_list.append(np.array([0, 20, -5], dtype="float32"))
+#target_list.append(np.array([-10, 10, -7.5], dtype="float32"))
+#target_list.append(np.array([0, 0, -10], dtype="float32"))
+#target_list.append(np.array([10, 10, -12.5], dtype="float32"))
 
 target = np.zeros(shape=(1, 3), dtype="float32")
 
@@ -66,12 +66,13 @@ pid = PID(1.5, 50, 4.1, ob_dim, act_dim, cfg['environment']['control_dt'], 1.727
 for i in range(10):
     env.reset()
 env.turn_on_visualization()
+env.start_video_recording("stage_2_pid_4s.mp4")
 loopCount = 0
-time.sleep(0.5)
+time.sleep(2.5)
 obs = env.observe()
 target = obs[0][0:3].copy()
 last_obs = obs.copy()
-targets = init_state - obs.copy()
+#targets = init_state - obs.copy()
 
 reward_sum = 0
 done_sum = 0
@@ -83,57 +84,61 @@ finished = np.zeros(env.num_envs, dtype=bool)
 count = 0
 path_length = 0
 iterator = 0
-for step in range(int(n_steps)):
-    frame_start = time.time()
-    #obs += targets
-    eval_obs = obs.copy()
-    targets[0][0:3] = target_list[iterator]
-    obs = obs * (1 + np.random.normal(0,0.05))
+for i in range(3):
+    env.reset()
+    env.reset()
+    env.reset()
+    for step in range(int(n_steps)):
+        frame_start = time.time()
+        #obs += targets
+        eval_obs = obs.copy()
+        #targets[0][0:3] = target_list[iterator]
+        obs = obs * (1 + np.random.normal(0,0.05))
 
-    if step == 800 or step == 1600 or step == 2400 or step == 3200:
-        print(step)
-        iterator+= 1
-        print(iterator)
-        #target = targets[iterator]
+        #if step == 800 or step == 1600 or step == 2400 or step == 3200:
+        #    print(step)
+        #    iterator+= 1
+        #    print(iterator)
+            #target = targets[iterator]
 
-    if step % 2 == 0:
-        trajectory.append(eval_obs[0][0:3])
+        if step % 2 == 0:
+            trajectory.append(eval_obs[0][0:3] - target)
 
-    for i in range(0, env.num_envs):
-        expert_obs_env_i = obs[i, :]
-        actions[i, :] = pid.control(obs=expert_obs_env_i.reshape((ob_dim, 1)),
-                                              target=targets[i][0:12].reshape((12, 1)), loopCount=loopCount)
+        for i in range(0, env.num_envs):
+            expert_obs_env_i = obs[i, :]
+            actions[i, :] = pid.control(obs=expert_obs_env_i.reshape((ob_dim, 1)),
+                                                  target=targets[i][0:12].reshape((12, 1)), loopCount=loopCount)
 
-    reward, dones = env.step(actions)
-    reward_sum += sum(reward)
-    done_sum += sum(dones)
-    done_vec[step] = dones.reshape(env.num_envs, 1).copy()
-
-
-    for i in range(env.num_envs):
-        path_length += np.sqrt(np.power(eval_obs[i][0]-last_obs[i][0],2) + np.power(eval_obs[i][1]-last_obs[i][1],2) + np.power(eval_obs[i][2]-last_obs[i][2],2))
-        if np.sqrt(np.power(eval_obs[i][0],2) + np.power(eval_obs[i][1],2) + np.power(eval_obs[i][2],2)) < 0.2:
-            if finished[i] == False and step > 200:
-                all_times += step
-                finished[i] = True
-                count += 1
-
-    last_obs = eval_obs.copy()
-    obs = env.observe()
+        reward, dones = env.step(actions)
+        reward_sum += sum(reward)
+        done_sum += sum(dones)
+        done_vec[step] = dones.reshape(env.num_envs, 1).copy()
 
 
-    # frequency of outter PID acceleration controller
-    if loopCount == 8:
-        loopCount = 7
-        #if step >= n_steps/4:
-         #   loopCount = 3
-    loopCount += 1
+        for i in range(env.num_envs):
+            path_length += np.sqrt(np.power(eval_obs[i][0]-last_obs[i][0],2) + np.power(eval_obs[i][1]-last_obs[i][1],2) + np.power(eval_obs[i][2]-last_obs[i][2],2))
+            if np.sqrt(np.power(eval_obs[i][0],2) + np.power(eval_obs[i][1],2) + np.power(eval_obs[i][2],2)) < 0.1:
+                if finished[i] == False and step > 200:
+                    all_times += step
+                    finished[i] = True
+                    count += 1
 
-    frame_end = time.time()
+        last_obs = eval_obs.copy()
+        obs = env.observe()
 
-    wait_time = cfg['environment']['control_dt'] - (frame_end - frame_start)
-    #if wait_time > 0.:
-    #    time.sleep(wait_time)
+
+        # frequency of outter PID acceleration controller
+        if loopCount == 8:
+            loopCount = 7
+            #if step >= n_steps/4:
+             #   loopCount = 3
+        loopCount += 1
+
+        frame_end = time.time()
+
+        wait_time = cfg['environment']['control_dt'] - (frame_end - frame_start)
+        if wait_time > 0.:
+            time.sleep(wait_time)
 
 num_failed_envs, index = helper.identify_failed_envs(done_vec)
 
@@ -143,8 +148,9 @@ print('{:<40} {:>6}'.format("failed environments: ", '{:0.6f}'.format(num_failed
 print('{:<40} {:>6}'.format("total reward: ", '{:0.6f}'.format(reward_sum)))
 print('----------------------------------------------------\n')
 
-
-#print(all_times * cfg["environment"]["control_dt"]/count)
+if count != 0:
+    print(all_times * cfg["environment"]["control_dt"]/count)
+    print(count)
 print(path_length/cfg["environment"]["num_envs"])
 
 np.savetxt(os.path.join(task_path, 'pid_trajectory_neg.csv'), trajectory, delimiter=",")
@@ -154,3 +160,4 @@ start_step_id = step + 1
 reward_ll_sum = 0.0
 
 env.turn_off_visualization()
+env.stop_video_recording()

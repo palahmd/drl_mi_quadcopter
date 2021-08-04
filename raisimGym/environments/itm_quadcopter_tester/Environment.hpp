@@ -85,8 +85,8 @@ namespace raisim {
 
         void reset() final {
             /// set random target point or state
-            setNRandomTargets(15, 1);
-            //setNRandomStates(1, false, 2, 5);
+            setRandomTargets(15, 1);
+            //setRandomStates(1, false, 2, 5);
 
             robot_->setState(gc_init_, gv_init_);
             updateObservation();
@@ -251,7 +251,7 @@ namespace raisim {
         }
 
 
-        void setNRandomTargets(double radius, int updateRate){
+        void setRandomTargets(double radius, int updateRate){
             if (updateTarget){
                 for(int i =0; i<3; i++) targetPoint_(i) = generateRandomValue(-1, 1);
                 targetPoint_.head(3) /= targetPoint_.head(3).norm();
@@ -270,7 +270,7 @@ namespace raisim {
         }
 
 
-        void setNRandomStates(double pos, bool rot_bool, double vel, double angVel){
+        void setRandomStates(double pos, bool rot_bool, double vel, double angVel){
             for (int i=0; i<3; i++){
                 gc_init_(i) = generateRandomValue(-pos, pos);
                 gv_init_(i) = generateRandomValue(-vel, vel);

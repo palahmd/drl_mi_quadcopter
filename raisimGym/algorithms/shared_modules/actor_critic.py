@@ -1,9 +1,16 @@
+"""
+This file is mostly based on the respective file of the original raisimGymTorch repository with minor/major
+modifications.
+"""
+
 import torch.nn as nn
 import numpy as np
 import torch
 from torch.distributions import Normal
 
-
+""" This module implements two neural networks with an actor-critic architecture 
+    (http://incompleteideas.net/book/first/ebook/node66.html), either with two comepletely seperate neural networks or  
+    two neural networks with a shared first layer. The actor has a pre-defined distribution (Gaussian) """
 class Actor:
     def __init__(self, architecture, distribution, device='cpu', shared_nets=False):
         super(Actor, self).__init__()
@@ -15,6 +22,7 @@ class Actor:
         self.device = device
         self.shared_nets = shared_nets
 
+    # samples an action over the current distribution
     def sample(self, obs):
         if self.shared_nets:
             logits = self.architecture.actor_net(obs)
@@ -23,6 +31,7 @@ class Actor:
         actions, log_prob = self.distribution.sample(logits)
         return actions.cpu().detach(), log_prob.cpu().detach()
 
+    # evaluates the log-probability of a given action to a sampled action
     def evaluate(self, obs, actions):
         if self.shared_nets:
             action_mean = self.architecture.actor_net(obs)
@@ -33,7 +42,7 @@ class Actor:
     def parameters(self):
         return [*self.architecture.parameters(), *self.distribution.parameters()]
 
-    # TODO: try cpu().detach()
+    # returns the direct output of the neural network
     def noiseless_action(self, obs):
         if self.shared_nets:
             return self.architecture.actor_net(obs).cpu().detach()
@@ -72,12 +81,14 @@ class Critic:
         self.architecture.to(device)
         self.shared_nets = shared_nets
 
+    # predicts the expected return based on the current state
     def predict(self, obs):
         if self.shared_nets:
             return self.architecture.critic_net(obs).detach()
         else:
             return self.architecture.architecture(obs).detach()
 
+    # predicts/evaluates the expected return based on past states with the current network parameters
     def evaluate(self, obs):
         if self.shared_nets:
             return self.architecture.critic_net(obs)
@@ -95,7 +106,7 @@ class Critic:
         return self.architecture.input_shape
 
 class sharedBaseNetMLP(nn.Module):
-    """ For a [n, n] Neural Network"""
+    # creates two Multi Layer Perceptrons (MLP) with shared first layer
     def __init__(self, base_shape, actor_shape, critic_shape, activation_fn, input_size, output_size):
         super(sharedBaseNetMLP, self).__init__()
 
@@ -120,9 +131,8 @@ class sharedBaseNetMLP(nn.Module):
         self.actor_output_shape = [output_size[0]]
         self.critic_output_shape = [output_size[1]]
 
-
-
 class MLP(nn.Module):
+    # creates two Multi Layer Perceptron
     def __init__(self, shape, actionvation_fn, input_size, output_size):
         super(MLP, self).__init__()
         self.activation_fn = actionvation_fn

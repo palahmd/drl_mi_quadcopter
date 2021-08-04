@@ -24,7 +24,7 @@ task_path = os.path.dirname(os.path.realpath(__file__))
 weight_path = args.weight.rsplit('/', 1)[0]
 
 # config
-cfg = YAML().load(open(weight_path + "/dagger_cfg.yaml", 'r'))
+cfg = YAML().load(open(weight_path + "/ppo_cfg.yaml", 'r'))
 
 # create environment from the configuration file
 #cfg['environment']['num_envs'] = 1

@@ -56,8 +56,8 @@ for update in range(1000000):
     for i in range(10):
         env.reset()
     env.turn_on_visualization()
-    loopCount = 0
     time.sleep(0.5)
+    loopCount = 0
     obs = env.observe()
     #targets = init_state - obs.copy()
 

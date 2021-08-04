@@ -85,10 +85,13 @@ namespace raisim {
 
         void reset() final {
             /// set random target point or state
-            //setNRandomTargets(10, 1);
+            //setRandomTargets(10, 1);
             //setRandomState(0, false, 2, 4);
-            //setTarget(0, 10, 10);
-            //loopCount_=-5;
+            //setTarget(10, 10, 10);
+            setRandomStates(0, true, 2, 4);
+
+            loopCount_=0;
+            hitGround = false;
 
             robot_->setState(gc_init_, gv_init_);
             updateObservation();
@@ -140,9 +143,10 @@ namespace raisim {
             updateObservation();
             loopCount_++;
             /*
-            if (loopCount_== 800) setTarget(0, 20, 0);
-            if (loopCount_== 1600) setTarget(0, 10, -10);
-            if (loopCount_== 2400) setTarget(0, 0, 0);
+            if (loopCount_== 800) setTarget(0, 20, -5);
+            if (loopCount_== 1600) setTarget(-10, 10, -7.5);
+            if (loopCount_== 2400) setTarget(0, 0, -10);
+            if (loopCount_== 3200) setTarget(10, 10, -12.5);
             */
             relativeAbsPosition = (targetPoint_.head(3) - bodyPos_).norm();
 
@@ -214,13 +218,14 @@ namespace raisim {
 
 
             for(auto& contact: robot_->getContacts()) {
-                /*
+
                 if (bodyIndices_.find(contact.getlocalBodyIndex()) == bodyIndices_.end()) {
                     /// prevents the random target to change too early; return true will call reset() and change loopCount_
-                    loopCount_++;
-                    updateTarget = false;
-                    return true;
-                }*/
+                    //loopCount_++;
+                    //updateTarget = false;
+                    //return true;
+                    hitGround = true;
+                }
             }
 
             if (std::abs((gc_.head(3)).mean()) > 30){
@@ -244,11 +249,20 @@ namespace raisim {
 
             genForces_.head(3) = forces_worldFrame_.e();
             genForces_.segment(3,3) = torques_worldFrame_.e();
+
+            if(hitGround) genForces_ *= 0;
+
             robot_->setGeneralizedForce(genForces_);
 
-            /// this option will visualize the applied forces and torques
-            // robot_->setExternalForce(0, forces_worldFrame_);
-            // robot_->setExternalTorque(0, torques_worldFrame_);
+            if(loopCount_ == 25000 ) {
+                Eigen::Vector3d force, torque;
+                force << -20, -20, 0;
+                torque << -5, -5, -5;
+
+                /// this option will visualize the applied forces and torques
+                robot_->setExternalForce(0, force);
+                robot_->setExternalTorque(0, torque);
+            }
         }
 
 
@@ -262,7 +276,7 @@ namespace raisim {
         }
 
 
-        void setNRandomTargets(double radius, int updateRate){
+        void setRandomTargets(double radius, int updateRate){
             if (updateTarget){
                 for(int i =0; i<3; i++) targetPoint_(i) = generateRandomValue(-1, 1);
                 targetPoint_.head(3) /= targetPoint_.head(3).norm();
@@ -289,13 +303,27 @@ namespace raisim {
             }
             gc_init_.head(3) *= pos;
             gv_init_.head(3) *= vel;
-            //gv_init_[2] = 0;
+            gv_init_[2] = 0;
             gv_init_.segment(3,3) *= angVel;
-            gc_init_(3) =  0.42;
-            gc_init_(4) =  0.41;
-            gc_init_(5) =  0.81;
+            gc_init_(3) =  0;
+            gc_init_(4) =  -1;
+            gc_init_(5) =  0;
             gc_init_(6) =  0.;
             
+        }
+
+        void setRandomStates(double pos, bool rot_bool, double vel, double angVel){
+            for (int i=0; i<3; i++){
+                gc_init_(i) = generateRandomValue(-pos, pos);
+                gv_init_(i) = generateRandomValue(-vel, vel);
+                gv_init_(i + 3) = generateRandomValue(-angVel, angVel);
+            }
+            if (rot_bool) {
+                for (int i = 0; i < 4; i++) {
+                    gc_init_(i+3) = generateRandomValue(0,1);
+                }
+                gc_init_.segment(3, 4) /= gc_init_.segment(3, 4).norm();
+            }
         }
 
         double generateRandomValue(double MIN, double MAX){
@@ -375,6 +403,7 @@ namespace raisim {
         bool nRandomTargets = false;
         bool updateTarget = false;
         int loopCount_ = 0;
+        bool hitGround = false;
         double thrusts_before;
 
         std::random_device rd;
