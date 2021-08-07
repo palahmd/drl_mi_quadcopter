@@ -1,6 +1,5 @@
 """
-This file is mostly based on the respective file of the original raisimGymTorch repository with minor/major
-modifications.
+This file is partly based on the respective file of the original raisimGymTorch repository with modifications.
 """
 
 from datetime import datetime
@@ -201,7 +200,6 @@ class PPO:
                 mean_returns += returns_batch.mean().item()
                 mean_advantages += advantages_batch.mean().item()
                 mean_bc_loss += bc_loss.item()
-
 
         num_updates = self.num_learning_epochs * self.num_mini_batches
         mean_loss /= num_updates

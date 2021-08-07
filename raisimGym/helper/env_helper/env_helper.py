@@ -88,7 +88,7 @@ class helper:
         self.obs_rms.mean = np.loadtxt(mean_file_name, dtype=np.float32)
         self.obs_rms.var = np.loadtxt(var_file_name, dtype=np.float32)
 
-    # load the neural network model parameters
+    # load the neural network model parameters and save setup config of pre-trained model
     def load_param(self, weight_path, actor, critic, learner, data_dir, file_name, save_items=True):
         if weight_path == "":
             raise Exception("\nCan't find the pre-trained weight, please provide a pre-trained weight with --weight switch\n")

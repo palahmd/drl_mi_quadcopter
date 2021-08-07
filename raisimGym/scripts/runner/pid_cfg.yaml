@@ -1,0 +1,33 @@
+seed: 1
+record_video: yes
+
+environment:
+  simulation_dt: 0.0025
+  control_dt: 0.01
+  max_time: 15.0
+  render: True
+
+  num_envs: 1
+  eval_every_n: 20
+  visualize_eval: True
+  num_threads: 40
+
+# PID-controller does not need a reward. Still, a reward can benchmark the DRL vs. PID controller if they are defined
+# equally
+  reward:
+    position:
+      coeff: -0.003
+    thrust:
+      coeff: 0.0
+    orientation:
+      coeff: -0.002
+    angularVelocity:
+      coeff: -0.0005
+
+helper:
+  normalize_ob: Flase # might make no sense in this task
+  update_mean: False
+  scale_action: False # because scaling is done in Environment.hpp for better performance
+  clip_action: False # either scale or clip action to [-1, 1]. Also works fine.
+
+

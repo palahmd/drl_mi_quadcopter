@@ -180,7 +180,6 @@ class DAgger:
                 # env_helper.limit_actions if action should be clipped
                 self.actions[chosen_envs[env]] = env_helper.limit_action(self.learner_actions[chosen_envs[env]])
 
-
     def adjust_beta(self):
         # either lock beta at maximum/minimum value or adjust beta cyclical
         if self.beta <= self.beta_goal:
@@ -192,7 +191,6 @@ class DAgger:
             self.beta_scheduelr = 0
             
         self.beta -= self.beta_scheduler
-
 
     """ Main training: rolling out storage and training the learner with a one-step behavioral cloning """
 
@@ -257,7 +255,6 @@ class DAgger:
                 mean_value_loss += value_loss.item()
                 mean_values += target_values_batch.mean().item()
                 self.tot_dones += dones_batch.sum().item()
-
 
         num_updates = self.num_learning_epochs * self.num_mini_batches
         mean_loss /= num_updates

@@ -23,7 +23,7 @@ class PID:
                       [-0.1710491, -0.1710491, 0.1710491, 0.1710491],
                       [0.016, -0.016, 0.016, -0.016]]))
 
-    def control(self, obs, target, loopCount):
+    def control(self, obs, target, pos_controller_loopCount):
         eulerAngles = self.quatToEuler(obs[18:22])
         currState = np.concatenate([obs[0:3], eulerAngles, obs[12:18]])
         desState = np.zeros(shape=(12, 1))
@@ -32,7 +32,7 @@ class PID:
         # outer PID controller for Position Control, runs with 20 Hz
         # input: error between target point and current state
         # output: desired acceleration, desired pitch and roll angles and u[0] for altitude control
-        if loopCount > 0:
+        if pos_controller_loopCount > 0:
             desAcc = self.pGain * errState[0:3] + self.dGain * errState[6:9]
             desState[3] = (1 / 9.81 * (desAcc[0] * np.sin(currState[5]) - desAcc[1] * np.cos(currState[5])))/4
             desState[4] = (1 / 9.81 * (desAcc[0] * np.cos(currState[5]) + desAcc[1] * np.sin(currState[5])))/4
@@ -82,4 +82,3 @@ class PID:
         angles[2] = np.arctan2(siny_cosp, cosy_cosp)
 
         return angles
-

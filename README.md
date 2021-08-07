@@ -41,30 +41,32 @@ cd drl_mi_quadcopter/raisimGym/scripts
 bash init.sh
 bash compile.sh
 ```
-When executing `bash init.sh`, you will be asked to specify the directory to raisimLib. `init.sh` basically links
-the algorithm and environment folders to the the raisimGymTorch module of raisimLib. `compile.sh` compiles the environments in
+When executing `bash init.sh`, you will be asked to specify the directory to raisimLib. init.sh basically links
+the algorithm and environment folders to the the raisimGymTorch module of raisimLib. compile.sh compiles the environments in
 raisimGymTorch. Before running RaiSim, you also need to copy your activation key (license) into the folder /rsc. 
 It is blacklisted by .gitignore and will not be uploaded into this repository in a commit.
 
 ## How to run the Scripts
 The training and testing python-scripts are provided in the respective environment folders. The bash-files in the
 raisimGym/scripts folder exemplify how to train, re-train or test an agent. 
+**To visualize the simulation, you need to start raisimUnity or raisimUnityOpenGL which you can find in the raisimLib folder
+of the original RaiSim library**
 ### Running a Pre-Trained Agent
 This repository provides two pre-trained agents: One from the first and one from the second training stage. For instance, 
 to run the PPO-agent in 
 
 ## Folder Structure
-* raisim: C++ version of the quadcopter controlled by a PID-controller. It needs to be built with cmake.
-* raisimGym: DRL training environment and scripts for automated training
-  * agents: Pre-trained agents.
-  * algorithms: Code library containing the Neural Network module and the DAgger, PPO and PID-controller algorithms
-  * environments: Different training and testing environments. The Environment.hpp file contains the simulation of the robot
+* **raisim**: C++ version of the quadcopter simulation, controlled by a PID-controller. Building it with cmake will add an executable to run the simulation.
+* **raisimGym**: DRL training environment and scripts for automated training
+  * **agents**: Pre-trained agents.
+  * **algorithms**: Code library containing the Neural Network module and the DAgger, PPO and PID-controller algorithms
+  * **environments**: Different training and testing environments. The Environment.hpp file contains the simulation of the robot
   and the task setup. In some environments, it also contains the PID-controller which provides a control feedback in the training phase
-  * helper: an enironment helper for some additional functions. 
-  * scripts: Setup, training and testing scripts. The running and testing scripts show how to run the respective scripts with and without a 
+  * **helper**: an enironment helper for some additional functions. 
+  * **scripts**: Setup, training and testing scripts. The running and testing scripts show how to run the respective scripts with and without a 
     pre-trained neural network model.
-* raisimPy: The python version of the quadcopter. It solely launches the quadcopter.
-* rsc: contains the urdf model of the quadcopter and the activation key. 
+* **raisimPy**: The python version of the quadcopter simulation. It solely launches the quadcopter.
+* **rsc**: contains the urdf model of the quadcopter and the activation key. 
 
 
 

@@ -1,6 +1,5 @@
 """
-This file is mostly based on the respective file of the original raisimGymTorch repository with minor/major
-modifications.
+This file is partly based on the respective file of the original raisimGymTorch repository with modifications.
 """
 
 import torch.nn as nn
