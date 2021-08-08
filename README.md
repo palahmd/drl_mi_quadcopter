@@ -32,10 +32,6 @@ like a conda environment (https://docs.anaconda.com/).
   * vulkan: https://linuxconfig.org/install-and-test-vulkan-on-linux
 * PyTorch and cuda: follow the instructions on https://pytorch.org/get-started/locally/. If using graphics card for training acceleration, make sure you have min. 2 GB VRAM.
 
-
-
-https://user-images.githubusercontent.com/60257014/128645814-e53f56ab-7396-42ac-a906-52e7334f512e.mp4
-
 ### Setup of RaiSim
 Execute the following lines to download and setup RaiSim. It is recommended into clone the raisimLib repository to the home folder. 
 ```commandline 
