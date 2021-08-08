@@ -1,4 +1,4 @@
-# Deep Reinforcement Learning-based Control for the Quadcopter with model-indications - using RaiSim v1.1.0
+# Deep Reinforcement Learning-based Control for the Quadcopter with Model Indications - using RaiSim v1.1.0
 This repository is part of the study Thesis "Deep Reinforcement Learning-based Control for the Quadcopter with Model-Indications".
 The DRL-based controller is trained in a two-staged training approach as illustrated in the Figure below. In the first training 
 stage, a pre-training of the controller is performed with an Imitation Learning algorithm where an initial policy is trained with the Data Aggregation (DAgger) method. The supervised learning objective
@@ -8,6 +8,11 @@ supposed to explore a more robust control strategy and enhance stability in a mo
 
 ![](docs/method.png)
 
+Stage 1:
+https://user-images.githubusercontent.com/60257014/128645892-054e8222-86d6-4f1f-9760-9493708a1e80.mp4
+
+Stage 2:
+https://user-images.githubusercontent.com/60257014/128645824-947115bf-e501-436f-b79b-e6df5c0f1227.mp4
 
 
 ## Getting Started
@@ -26,6 +31,10 @@ like a conda environment (https://docs.anaconda.com/).
   * `sudo apt install minizip ffmpeg`
   * vulkan: https://linuxconfig.org/install-and-test-vulkan-on-linux
 * PyTorch and cuda: follow the instructions on https://pytorch.org/get-started/locally/. If using graphics card for training acceleration, make sure you have min. 2 GB VRAM.
+
+
+
+https://user-images.githubusercontent.com/60257014/128645814-e53f56ab-7396-42ac-a906-52e7334f512e.mp4
 
 ### Setup of RaiSim
 Execute the following lines to download and setup RaiSim. It is recommended into clone the raisimLib repository to the home folder. 
