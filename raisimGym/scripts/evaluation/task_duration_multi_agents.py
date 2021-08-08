@@ -83,7 +83,6 @@ else:
 
     env.turn_on_visualization()
     time.sleep(3)
-    env.reset()
 
     # steps
     n_steps = math.floor(cfg['environment']['max_time'] / cfg['environment']['control_dt'])

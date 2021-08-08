@@ -9,6 +9,13 @@ import datetime
 import argparse
 import numpy as np
 
+"""
+This script tests the PID controller one of the following task and outputs a csv-file with the trajectory:
+    * sequence of targets (-e target_sequence)
+    * random initial state (-e random_state)
+    * a side hit after 2.5 seconds (-e side_hit) 
+"""
+
 # configuration
 parser = argparse.ArgumentParser()
 parser.add_argument('-e', '--environment', help='set environment', type=str, default='target_tracking')
@@ -76,6 +83,7 @@ n_steps = math.floor(cfg['environment']['max_time'] / cfg['environment']['contro
 total_steps = n_steps * env.num_envs
 pid = PID(1.5, 50, 4.1, ob_dim, act_dim, cfg['environment']['control_dt'], 1.727)
 
+env.reset()
 env.turn_on_visualization()
 env.start_video_recording("stage_2_pid_4s.mp4")
 pos_controller_loopCount = 0

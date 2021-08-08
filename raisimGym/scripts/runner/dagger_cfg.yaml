@@ -14,13 +14,13 @@ environment:
 
   reward:
     position:
-      coeff: -0.001
+      coeff: -0.003
     thrust:
       coeff: 0.0
     orientation:
       coeff: -0.002
     angularVelocity:
-      coeff: -0.0002
+      coeff: -0.0005
 
 
 architecture:
@@ -40,17 +40,17 @@ helper:
 
 
 hyperparam:
-  num_mini_batches: 6
-  num_learning_epochs: 8
-  shuffle: False # True might give better sample efficiency
+  num_mini_batches: 8
+  num_learning_epochs: 12
+  shuffle: False # True should give better sample efficiency
   gamma: 0.998
   lam: 0.95
   init_beta: 0.5
   beta_min: 0.3
   beta_scheduler: 0.001
-  use_lr_scheduler: False # using torch.optim.lr_scheduler.CyclicLR
+  use_lr_scheduler: False
   max_lr: 0.002
-  min_lr: 0.001 # is the actual learning rate if use_lr_scheduler = False
+  min_lr: 0.00005 # is the actual learning rate if use_lr_scheduler = False
   l2_reg_weight: 0.0001
-  entropy_weight: 0.0001
+  entropy_weight: 0.0005
 

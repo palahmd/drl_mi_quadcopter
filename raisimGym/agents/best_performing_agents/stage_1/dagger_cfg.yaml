@@ -15,15 +15,12 @@ environment:
   reward:
     position:
       coeff: -0.003
-    relPosition:
-      coeff: 0.0
     thrust:
-      coeff: 0.0 # maybe not a good choice
+      coeff: 0.0
     orientation:
       coeff: -0.002
     angularVelocity:
-      coeff: -0.0005 # maybe not a good choice
-
+      coeff: -0.0005
 
 architecture:
   shared_nets: False
@@ -35,10 +32,10 @@ architecture:
                               # False: loss = -logProb
 
 helper:
-  normalize_ob: True # might make no sense in this task
-  update_mean: False
-  scale_action: False # because scaling is done in Environment.hpp for better performance
-  clip_action: False # either scale or clip action to [-1, 1]. Also works fine.
+  normalize_ob: True # True: (obs - obs_rms.mean) / obs_rms.var
+  update_mean: False # True: update mean and var ob obs_rms
+  scale_action: False # False: scaling is done in Environment.hpp for better performance
+  clip_action: False # True: instead of scaling, action is clipped to [-1, 1].
 
 
 hyperparam:

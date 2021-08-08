@@ -9,6 +9,11 @@ import datetime
 import argparse
 import numpy as np
 
+"""
+This script tests the PID controller on the target tracking task and outputs a csv-file with the durations for reaching 
+the target points
+"""
+
 # configuration
 parser = argparse.ArgumentParser()
 parser.add_argument('-e', '--environment', help='set environment', type=str, default='stage_1')
@@ -36,8 +41,8 @@ elif env_mode == 'stage_2':
     env = VecEnv(stage_2_testenv.RaisimGymEnv(home_path + "/../rsc", dump(cfg['environment'], Dumper=RoundTripDumper)),
                  cfg['environment'], normalize_ob=False)
 else:
-    raise Exception("Make sure to select a correct environment. Take a look at the runner-script.")
-
+    raise Exception("Make sure to select a correct environment. Take a look at the runner-script")
+    
 # shortcuts
 ob_dim = env.num_obs
 act_dim = env.num_acts
@@ -80,6 +85,8 @@ pl_vec = []
 dist = [0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
 for d in range(len(dist)):
     pl_vec.append([])
+    
+    env.reset()
 
     # set target
     obs = env.observe()

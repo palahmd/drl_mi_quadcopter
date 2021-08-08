@@ -1,8 +1,8 @@
-# Deep Reinforcement Learning-based Control for the Quadcopter with model-indications - using RaiSim v1.0.0
+# Deep Reinforcement Learning-based Control for the Quadcopter with model-indications - using RaiSim v1.1.0
 This repository is part of the study Thesis "Deep Reinforcement Learning-based Control for the Quadcopter with Model-Indications".
 The DRL-based controller is trained in a two-staged training approach as illustrated in the Figure below. In the first training 
 stage, a pre-training of the controller is performed with an Imitation Learning algorithm where an initial policy is trained with the Data Aggregation (DAgger) method. The supervised learning objective
-is the control strategy of a PID-controller for small angle conditions on the given states. Thereafter, the policy of the 
+is the control strategy of a PID controller for small angle conditions on the given states. Thereafter, the policy of the 
 DRL-based controller is further trained in a second training stage with Proximal Policy Optimization (PPO), where the controller is
 supposed to explore a more robust control strategy and enhance stability in a more challenging task.
 
@@ -21,8 +21,8 @@ like a conda environment (https://docs.anaconda.com/).
 * vulkan, minizip and ffmpeg: 
   * `sudo apt install minizip ffmpeg`
   * vulkan: https://linuxconfig.org/install-and-test-vulkan-on-linux
-* PyTorch and cuda: follow the instructions on https://pytorch.org/get-started/locally/
-    
+* PyTorch and cuda: follow the instructions on https://pytorch.org/get-started/locally/. If using graphics card for training acceleration, make sure you have min. 2 GB VRAM.
+
 ### Setup of RaiSim
 Execute the following lines to download and setup RaiSim. It is recommended into clone the raisimLib repository to the home folder. 
 ```commandline 
@@ -56,17 +56,16 @@ This repository provides two pre-trained agents: One from the first and one from
 to run the PPO-agent in 
 
 ## Folder Structure
-* **raisim**: C++ version of the quadcopter simulation, controlled by a PID-controller. Building it with cmake will add an executable to run the simulation.
+* **raisim**: C++ version of the quadcopter simulation, controlled by a PID controller. Building it with cmake will add an executable to run the simulation.
 * **raisimGym**: DRL training environment and scripts for automated training
   * **agents**: Pre-trained agents.
-  * **algorithms**: Code library containing the Neural Network module and the DAgger, PPO and PID-controller algorithms
+  * **algorithms**: Code library containing the Neural Network module and the DAgger, PPO and PID controller algorithms
   * **environments**: Different training and testing environments. The Environment.hpp file contains the simulation of the robot
-  and the task setup. In some environments, it also contains the PID-controller which provides a control feedback in the training phase
+  and the task setup. In some environments, it also contains the PID controller which provides a control feedback in the training phase
   * **helper**: an enironment helper for some additional functions. 
   * **scripts**: Setup, training and testing scripts. The running and testing scripts show how to run the respective scripts with and without a 
     pre-trained neural network model.
 * **raisimPy**: The python version of the quadcopter simulation. It solely launches the quadcopter.
-* **rsc**: contains the urdf model of the quadcopter and the activation key. 
-
+* **rsc**: contains the urdf model of the quadcopter and the activation key.
 
 

@@ -12,7 +12,8 @@ import torch.nn as nn
 import datetime
 
 """
-This script tests an agent on a target tracking task and outputs a csv-file with the durations to reach the goal
+This script tests an agent on the target tracking task and outputs a csv-file with the durations for reaching 
+the target points
 """
 
 # configuration
@@ -80,7 +81,6 @@ else:
 
     env.turn_on_visualization()
     time.sleep(3)
-    env.reset()
 
     # start recording
     #env.start_video_recording(datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S") + "test"+'.mp4')

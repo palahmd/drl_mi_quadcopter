@@ -12,7 +12,10 @@ import torch.nn as nn
 import datetime
 
 """
-This script tests an agent on a task and outputs a csv-file with the trajectory
+This script tests an agent one of the following task and outputs a csv-file with the trajectory:
+    * sequence of targets (-e target_sequence)
+    * random initial state (-e random_state)
+    * a side hit after 2.5 seconds (-e side_hit) 
 """
 
 # configuration

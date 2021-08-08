@@ -92,7 +92,7 @@ namespace raisim {
                 server_ = std::make_unique<raisim::RaisimServer>(world_.get());
                 server_->launchServer();
                 server_->focusOn(robot_);
-                visPoint = server_->addVisualSphere("visPoint", 0.1, 0.8, 0, 0);
+                visPoint = server_->addVisualSphere("visPoint", 0.2, 0.8, 0, 0);
             }
         }
 
