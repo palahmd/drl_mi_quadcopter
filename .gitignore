@@ -31,15 +31,16 @@
 *.app
 
 # folders
+.idea/
 build/
 raisim/build
-raisimGymTorch/build
-raisimGymTorch/raisim_gym_torch.egg-info
 raisim/cmake-build-debug/
-.idea/
-raisimGymTorch/data
-raisimGymTorch/training
-raisimGymTorch/raisimUnity
+raisimGym/build
+raisimGym/raisim_gym_torch.egg-info
+raisimGym/data
+raisimGym/training
+raisimGym/raisimUnity
+raisimGym/scripts/evaluation/outputs/*
 
 # other files
 rsc/activation.raisim
