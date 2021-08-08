@@ -40,7 +40,6 @@ raisimGym/raisim_gym_torch.egg-info
 raisimGym/data
 raisimGym/training
 raisimGym/raisimUnity
-raisimGym/scripts/evaluation/outputs/*
 
 # other files
 rsc/activation.raisim
