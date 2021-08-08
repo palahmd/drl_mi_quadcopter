@@ -6,6 +6,10 @@ is the control strategy of a PID controller for small angle conditions on the gi
 DRL-based controller is further trained in a second training stage with Proximal Policy Optimization (PPO), where the controller is
 supposed to explore a more robust control strategy and enhance stability in a more challenging task.
 
+![](docs/method.png)
+
+
+
 ## Getting Started
 To run the code, a license of RaiSim is needed. RaiSim provides a commercial license, a trial license 
 and an academic license which can be requested on https://raisim.com/sections/License.html.
@@ -48,12 +52,25 @@ It is blacklisted by .gitignore and will not be uploaded into this repository in
 
 ## How to run the Scripts
 The training and testing python-scripts are provided in the respective environment folders. The bash-files in the
-raisimGym/scripts folder exemplify how to train, re-train or test an agent. 
-**To visualize the simulation, you need to start raisimUnity or raisimUnityOpenGL which you can find in the raisimLib folder
-of the original RaiSim library**
+raisimGym/scripts folder exemplify how to train, re-train or test an agent. There is also a folder provided with examples.
+To visualize the simulation, you need to start raisimUnity or raisimUnityOpenGL which you can find in the raisimLib folder
+of the original RaiSim library.
 ### Running a Pre-Trained Agent
-This repository provides two pre-trained agents: One from the first and one from the second training stage. For instance, 
-to run the PPO-agent in 
+This repository provides two pre-trained agents: the best performing from the respective training stages. For instance, 
+to run the second stage agent in an environment with a sequence of targets, type:
+```commandline 
+cd $PATH_TO_REPOSITORY/raisimGym/scripts/evaluation
+python agent_trajectory_multi_scenarios.py -w $PATH_TO_REPOSITORY/raisimGym/agents/best_performing_agents/stage_2/full_2800.pt -e target_sequence
+```
+for other environments, change the argument e.g. to `-e side_hit` or `-e random_state`.
+
+### Running a Training
+Two training environments are provided. For instance, to train an agent in the first stage with the DAgger method, type:
+```commandline 
+cd $PATH_TO_REPOSITORY/raisimGym/scripts/runner
+python dagger_runner.py -e stage_1
+```
+The training configuration and parameters are defined in dagger_cfg.yaml.
 
 ## Folder Structure
 * **raisim**: C++ version of the quadcopter simulation, controlled by a PID controller. Building it with cmake will add an executable to run the simulation.
