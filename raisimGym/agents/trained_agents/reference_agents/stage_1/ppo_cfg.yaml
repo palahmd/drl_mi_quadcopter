@@ -49,6 +49,6 @@ hyperparam:
   value_loss_coef: 0.5
   use_clipped_value_loss: True # if True: PPO2, False: PPO
   l2_reg_coef: 0.0001
-  bc_coef: 0.005
+  bc_coef: 0.0
   entropy_coef: 0.0001
 
