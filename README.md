@@ -45,7 +45,7 @@ make install -j4
 ### Setup of this Repository
 Execute the following lines to download and setup this repository:
 ```commandline 
-git clone https://github.com/Pala-hmd/drl_mi_quadcopter.git
+git clone https://github.com/palahmd/drl_mi_quadcopter.git
 cd drl_mi_quadcopter/raisimGym/scripts
 bash init.sh
 bash compile.sh
