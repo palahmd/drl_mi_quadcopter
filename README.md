@@ -8,11 +8,23 @@ supposed to explore a more robust control strategy and enhance stability in a mo
 
 ![](docs/method.png)
 
-Stage 1:
-https://user-images.githubusercontent.com/60257014/128645892-054e8222-86d6-4f1f-9760-9493708a1e80.mp4
+Untrained agent in stage 1 task:
 
-Stage 2:
-https://user-images.githubusercontent.com/60257014/128645824-947115bf-e501-436f-b79b-e6df5c0f1227.mp4
+https://github.com/palahmd/drl_mi_quadcopter/assets/60257014/dd76966e-58b8-4a8c-a428-2ffb79a0babe
+
+Trained agent in stage 1 task:
+
+
+
+Trained agent in stage 2 task:
+
+https://github.com/palahmd/drl_mi_quadcopter/assets/60257014/921dfaee-3b07-4e4e-8374-6633b27bba7f
+
+Expert in stage 2 task:
+
+https://github.com/palahmd/drl_mi_quadcopter/assets/60257014/f6861ba3-7dc3-413b-946a-c9f4bc3c9c08
+
+
 
 
 ## Getting Started
