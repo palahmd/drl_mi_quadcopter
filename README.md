@@ -14,7 +14,7 @@ https://github.com/palahmd/drl_mi_quadcopter/assets/60257014/dd76966e-58b8-4a8c-
 
 Trained agent in stage 1 task:
 
-
+https://github.com/palahmd/drl_mi_quadcopter/assets/60257014/9aec65d6-a8ab-4ba6-ac6f-1f597d03f9c9
 
 Trained agent in stage 2 task:
 
